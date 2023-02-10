@@ -20,7 +20,7 @@ import kotlin.concurrent.timer
 /**
  * Simple UI to show the display of the emulator.
  *
- * @author Daniel Schulte 2017-2021
+ * @author Daniel Schulte 2017-2023
  */
 @ExperimentalUnsignedTypes
 class EmulatorUI {
@@ -51,7 +51,7 @@ class EmulatorUI {
 
         // load basic test program
         Timer().schedule(3000) {
-            System.memory.loadPrg("./test-src/c64/prg/clock compute.prg")
+            System.memory.loadPrg("./test-src/c64/prg/64 tester.prg")
         }
     }
 }

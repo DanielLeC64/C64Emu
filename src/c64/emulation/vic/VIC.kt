@@ -13,7 +13,7 @@ private val logger = KotlinLogging.logger {}
  * Emulation of the C64 video chip VIC-II - MOS 6567/6569.
  * Emulation only for PAL!
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2023
  */
 @ExperimentalUnsignedTypes
 class VIC {
@@ -22,6 +22,10 @@ class VIC {
     // TODO: set used video-bank (bit 0+1) in $DD00 (CIA2) (+$DD02 Port A data direction register)
 
     companion object {
+        val VIC_OFFSET = 0xD000
+        val VIC_ADDRESS_SPACE = 0xD000..0xD02E
+        val VIC_IO_AREA_SIZE = 47 //$D000-$D02E
+
         const val PAL_RASTERLINES: Int = 312
         const val PAL_RASTERCOLUMNS: Int = 367
         const val PAL_CYCLES_PER_RASTERLINE: Int = 63
@@ -61,16 +65,52 @@ class VIC {
         )
     }
 
+    private val vicRam: UByteArray
     val bitmapData: BufferedImage
     private var lastRasterLine: Int = 0
 
     init {
         logger.info { "init VIC" }
         bitmapData = BufferedImage(PAL_RASTERCOLUMNS, PAL_RASTERLINES, BufferedImage.TYPE_3BYTE_BGR)
+        vicRam = UByteArray(VIC_IO_AREA_SIZE)
     }
 
     fun saveScreenshot(filename: String) {
         ImageIO.write(bitmapData, "png", File(filename))
+    }
+
+    /**
+     * Stores a single byte at the given VIC address.
+     */
+    fun store(address: Int, byte: UByte) {
+        // translate address to $00-$2E
+        vicRam[address - VIC_OFFSET] = byte
+
+        // todo - do we need this?
+        /*when (address and 0x000F) {
+            else -> {
+                // todo - implementation
+                logger.info { "missing IMPL for VIC:write ${address.toHex()}" }
+                0x00.toUByte()
+            }
+        }*/
+    }
+
+    /**
+     * Fetches a single byte from the given VIC address.
+     */
+    fun fetch(address: Int): UByte {
+        // translate address to $00-$2E
+        return vicRam[address - VIC_OFFSET]
+
+        // todo - do we need this?
+        // use only bit 0-4, mask out all higher bits
+        /*when (address and 0x000F) {
+            else -> {
+                logger.info { "missing IMPL for VIC:read ${address.toHex()}" }
+                return vicRam[address and 0x000F]
+            }
+        }*/
     }
 
     internal fun refresh() {
@@ -81,7 +121,7 @@ class VIC {
         if (lastRasterLine != line) {
             // new rasterline starts now
             // store new line positon in $D012 + $D011
-            memory.store(VIC_RASTER, line.toUByte())
+            store(VIC_RASTER, line.toUByte())
             // TODO: store bit 8 of current line in bit 7 of $D011
             // raster last finished line to bitmap
             rasterLine(lastRasterLine)
@@ -92,7 +132,7 @@ class VIC {
     private fun rasterLine(rasterline: Int) {
         // display window from rasterline 51 - 250 (=200 lines)
         // display window from rastercolumn 24 - 343 (=320px)
-        val bitmapMode = memory.fetch(VIC_SCROLY) and 0b0010_0000u
+        val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
         val y: Int = rasterline - 51
         if (bitmapMode.toInt() == 0) {
             // text-mode
@@ -108,8 +148,8 @@ class VIC {
         // todo: multicolor text mode: set by bit 4 of $d016
         // todo: Extended Background Color Mode
         // todo: SCROLX bit 3 - 38/40 column mode
-        val borderColor = COLOR_TABLE[memory.fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
-        val backgroundColor = COLOR_TABLE[memory.fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+        val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
+        val backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
         val screenMemoryAddress = getScreenMemoryAddress()
         val videoBankAddress = getVideoBankAddress()
         val fetchFromCharMemoryFunction = getFetchFromCharMemoryFunction()
@@ -146,16 +186,16 @@ class VIC {
     }
 
     private fun rasterBitmapMode(rasterline: Int, y: Int) {
-        val isMulticolorMode = memory.fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
+        val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
         val videoBankAddress = getVideoBankAddress()
-        val borderColor = COLOR_TABLE[memory.fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
+        val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
         val textRow = y / 8
         val textRowAddr = textRow * 40
         val charY = y.rem(8)
         val bitmapColorRowAddress = videoBankAddress + getBitmapColorAddress() + textRowAddr
         val bitmapRowAddress = videoBankAddress + getBitmapAddress() + textRowAddr * 8 + charY
         val colorRamRowAddress = COLOR_RAM + textRowAddr
-        val backgroundColor = COLOR_TABLE[memory.fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+        val backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
 
         if (!isMulticolorMode) {
             // hires bitmap mode
@@ -245,23 +285,9 @@ class VIC {
         return memory.fetch(address + getVideoBankAddress())
     }
 
-    private fun fetchFromCharMemory(offset: Int): UByte {
-        val vicBank = getVideoBank()
-        val characterDotDataIndex = (memory.fetch(VIC_VMCSB) and 0b0000_1110u).toInt() shr 1
-        val characterDotDataAddress = offset + characterDotDataIndex * 0x800
-        return if ((characterDotDataIndex == 2 || characterDotDataIndex == 3) && (vicBank == 3 || vicBank == 1)) {
-            // get value from char ROM if
-            // * VIC bank 0 or 2 is selected  AND
-            // * char mem pointer is 2 or 3
-            memory.fetchFromCharROM(characterDotDataAddress)
-        } else {
-            fetchFromVideoBank(characterDotDataAddress)
-        }
-    }
-
     private fun getFetchFromCharMemoryFunction(): (offset: Int) -> UByte {
         val vicBank = getVideoBank()
-        val characterDotDataIndex = (memory.fetch(VIC_VMCSB) and 0b0000_1110u).toInt() shr 1
+        val characterDotDataIndex = (fetch(VIC_VMCSB) and 0b0000_1110u).toInt() shr 1
         return if ((characterDotDataIndex == 2 || characterDotDataIndex == 3) && (vicBank == 3 || vicBank == 1)) {
             // get value from char ROM if
             // * VIC bank 0 or 2 is selected  AND
@@ -273,12 +299,12 @@ class VIC {
     }
 
     private fun getScreenMemoryAddress(): Int {
-        return 0x0400 * ((memory.fetch(VIC_VMCSB) and 0b1111_0000u).toInt() shr 4)
+        return 0x0400 * ((fetch(VIC_VMCSB) and 0b1111_0000u).toInt() shr 4)
     }
 
     private fun getBitmapAddress(): Int {
         // bit 3 of VIC_VMCSB controls start of the bitmap data
-        return if (memory.fetch(VIC_VMCSB).toInt() and 0b0000_01000 == 0b0000_01000) {
+        return if (fetch(VIC_VMCSB).toInt() and 0b0000_01000 == 0b0000_01000) {
             0x2000
         } else {
             0x0000

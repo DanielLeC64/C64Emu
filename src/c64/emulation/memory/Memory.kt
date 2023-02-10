@@ -2,7 +2,9 @@ package c64.emulation.memory
 
 import c64.emulation.System.cia
 import c64.emulation.System.registers
+import c64.emulation.System.vic
 import c64.emulation.cia.CIA
+import c64.emulation.vic.VIC
 import c64.util.toHex
 import c64.util.toUnprefixedHex
 import mu.KotlinLogging
@@ -14,7 +16,7 @@ private val logger = KotlinLogging.logger {}
 /**
  * Class which encapsulates all operations on memory.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2023
  */
 @ExperimentalUnsignedTypes
 class Memory {
@@ -22,6 +24,9 @@ class Memory {
     companion object {
         const val MEM_SIZE: Int = 65536
         const val STACK_OFFSET: Int = 0x0100
+
+        const val CPU_PORT_DATA_DIRECTION_ADDR: Int = 0x0000
+        const val CPU_PORT_ADDR: Int = 0x0001
 
         val KERNAL_ADDRESS_SPACE = 0xE000..0xFFFF
         const val KERNAL_FILE: String = "./roms/kernal"
@@ -171,7 +176,7 @@ class Memory {
         // use only bit 0-15, mask out all higher bits
         var translatedAddress = address and 0xFFFF
         var mem: UByteArray = ram
-        val processorPort: Int = (ram[0x0001] and 0b0000_0111u).toInt()
+        val processorPort: Int = (ram[CPU_PORT_ADDR] and 0b0000_0111u).toInt()
         if (translatedAddress in BASIC_ADDRESS_SPACE) {
             // access Basic-ROM or RAM
             if (processorPort == 3 || processorPort == 7) {
@@ -187,13 +192,23 @@ class Memory {
                 translatedAddress -= CHARGEN_OFFSET
             }
             else if (processorPort > 4) {
-                // check for CIA1
-                if (translatedAddress in CIA.CIA_ADDRESS_SPACE) {
-                    return cia.fetch(translatedAddress)
+                // check for specific I/O areas
+                when (translatedAddress) {
+                    // TODO: CIA2
+                    // TODO: SID
+                    // TODO: color-ram
+                    in CIA.CIA_ADDRESS_SPACE -> {
+                        return cia.fetch(translatedAddress)
+                    }
+                    in VIC.VIC_ADDRESS_SPACE -> {
+                        return vic.fetch(translatedAddress)
+                    }
+                    else -> {
+                        // read from general I/O devices ram -> should be removed later
+                        mem = ioDevicesRam
+                        translatedAddress -= CHARGEN_OFFSET
+                    }
                 }
-                // I/O devices
-                mem = ioDevicesRam
-                translatedAddress -= CHARGEN_OFFSET
             }
         }
         else if (translatedAddress in KERNAL_ADDRESS_SPACE) {
@@ -424,16 +439,26 @@ class Memory {
         // use only bit 0-15, mask out all higher bits
         var translatedAddress = address and 0xFFFF
         var mem: UByteArray = ram
-        if (translatedAddress in CHARGEN_ADDRESS_SPACE && (ram[0x0001] and 0b0000_0111u).toInt() > 4) {
-            // check for CIA1
-            if (translatedAddress in CIA.CIA_ADDRESS_SPACE)
-            {
-                cia.store(translatedAddress, byte)
-                return
+        if (translatedAddress in CHARGEN_ADDRESS_SPACE && (ram[CPU_PORT_ADDR] and 0b0000_0111u).toInt() > 4) {
+            // check for specific I/O areas
+            when (translatedAddress) {
+                // TODO: CIA2
+                // TODO: SID
+                // TODO: color-ram
+                in CIA.CIA_ADDRESS_SPACE -> {
+                    cia.store(translatedAddress, byte)
+                    return
+                }
+                in VIC.VIC_ADDRESS_SPACE -> {
+                    vic.store(translatedAddress, byte)
+                    return
+                }
+                else -> {
+                    // write into general I/O devices ram -> should be removed later
+                    mem = ioDevicesRam
+                    translatedAddress -= CHARGEN_OFFSET
+                }
             }
-            // write to I/O devices
-            mem = ioDevicesRam
-            translatedAddress -= CHARGEN_OFFSET
         }
         mem[translatedAddress] = byte
     }

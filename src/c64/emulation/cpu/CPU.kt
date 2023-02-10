@@ -9,6 +9,7 @@ import c64.emulation.System.vic
 import c64.emulation.cpu.instructionset.*
 import c64.emulation.debugger.Debugger
 import c64.emulation.disassemble.Disassembly
+import c64.emulation.memory.Memory
 import c64.util.toHex
 import mu.KotlinLogging
 
@@ -26,7 +27,7 @@ typealias InstructionWithArg = (value: UByte) -> Unit
 /**
  * Emulator for CPU MOS 6510/8500.
  *
- * @author Daniel Schulte 2017-2021
+ * @author Daniel Schulte 2017-2023
  */
 @ExperimentalUnsignedTypes
 class CPU {
@@ -125,9 +126,9 @@ class CPU {
     fun reset() {
         registers.reset()
         // hardwired processor port data direction
-        memory.store(0x0000, 0x27u)
+        memory.store(Memory.CPU_PORT_DATA_DIRECTION_ADDR, 0x27u)
         // hardwired processor port
-        memory.store(0x0001, 0x37u)
+        memory.store(Memory.CPU_PORT_ADDR, 0x37u)
         registers.PC = memory.fetchWord(RESET_VECTOR)
     }
 

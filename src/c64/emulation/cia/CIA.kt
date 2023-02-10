@@ -14,7 +14,7 @@ private val logger = KotlinLogging.logger {}
 /**
  * Emulation of the C64 Complex Interface Adapter (CIA 6526).
  *
- * @author Daniel Schulte 2017-2021
+ * @author Daniel Schulte 2017-2023
  */
 @ExperimentalUnsignedTypes
 class CIA {
@@ -293,13 +293,13 @@ class CIA {
         // check for missing implementation
         if (byte.toInt() and 0b1110_0110 > 0) {
             // todo: implementation
-            logger.warn { "not handled BITS for writeCIACRA register: ${(byte and 0b1110_0110u).toBinary()}" }
+            logger.warn { "not handled BITS for write CIACRA register: ${(byte and 0b1110_0110u).toBinary()}" }
         }
     }
 
     private fun writeCIACRB(byte: UByte) {
         // logger.info {"write to CIACRB register: ${byte.toBinary()}"}
-        logger.warn { "not handled BITS for writeCIACRB register: ${byte.toBinary()}" }
+        logger.warn { "not handled BITS for write CIACRB register: ${byte.toBinary()}" }
         // todo: implementation
     }
 }
