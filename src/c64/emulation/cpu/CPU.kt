@@ -158,7 +158,7 @@ class CPU {
                 // do the VIC stuff
                 vic.refresh()
 
-                //  IRQ handling
+                // IRQ handling
                 handleInterrupt()
 
                 var opCodeCycleCount = registers.cycles - lastMachineCycleCount
