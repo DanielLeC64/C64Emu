@@ -51,9 +51,11 @@ class CIA {
     private var timerAIRQEnabled = false
     private var timerAEnabled = false
     private var timerARunMode = 0
+    // starting value for timer A
     private var timerALatch: Int = 0x0000
     private var timerA: Int = 0x0000
     private var timerBIRQEnabled = false
+    // starting value for timer B
     private var timerBLatch: Int = 0x0000
     private var timerB: Int = 0x0000
 
