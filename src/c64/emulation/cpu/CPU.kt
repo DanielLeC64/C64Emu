@@ -177,6 +177,10 @@ class CPU {
         }
     }
 
+    fun signalBreakIRQ() {
+        irqTypeSignaled = 4
+    }
+
     fun signalTimerAIRQ() {
         irqTypeSignaled = 1
     }

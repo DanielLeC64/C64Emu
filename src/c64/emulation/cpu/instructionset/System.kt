@@ -34,16 +34,19 @@ class System {
         registers.cycles += 7
         // increment PC - byte after opCode will be ignored
         registers.PC++
-        // store PC to stack
-        memory.pushWordToStack(registers.PC)
+        // store PC to stack - will be done in CPU.handleInterrupt
+        //memory.pushWordToStack(registers.PC)
         // set break flag
         registers.B = true
-        // store processor status to stack
-        memory.pushToStack(registers.getProcessorStatus())
-        // set interrupt flag
-        registers.I = true
-        // load IRQ/BRK vector into PC
-        registers.PC = memory.fetchWord(0xFFFE)
+        // store processor status to stack - will be done in CPU.handleInterrupt
+        //memory.pushToStack(registers.getProcessorStatus())
+        // set interrupt flag - will be done in CPU.handleInterrupt
+        //registers.I = true
+        // load IRQ/BRK vector into PC - will be done in CPU.handleInterrupt
+        //registers.PC = memory.fetchWord(CPU.IRQ_BRK_VECTOR)
+
+        // signal BRK interrupt
+        cpu.signalBreakIRQ()
     }
 
     /**
