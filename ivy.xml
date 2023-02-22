@@ -10,7 +10,7 @@
     </configurations>
     <dependencies>
         <dependency org="org.jetbrains.kotlinx" name="kotlinx-coroutines-core" rev="1.6.4" conf="build,test,runtime->default"/>
-        <dependency org="io.github.microutils" name="kotlin-logging" rev="1.12.0" conf="build,test,runtime->default"/>
+        <dependency org="io.github.microutils" name="kotlin-logging-jvm" rev="3.0.5" conf="build,test,runtime->default"/>
         <dependency org="org.slf4j" name="slf4j-api" rev="2.0.3" conf="build,test,runtime->default"/>
         <dependency org="org.slf4j" name="slf4j-log4j12" rev="2.0.3" conf="runtime->default"/>
         <dependency org="junit" name="junit" rev="4.12" conf="test,runtime->default"/>
