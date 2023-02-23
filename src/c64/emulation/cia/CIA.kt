@@ -48,13 +48,18 @@ class CIA {
         const val CIACRB: Int = 0x0F  //  Control Register B
     }
 
+    private var craValue: UByte = 0x00u
     private var timerAIRQEnabled = false
     private var timerAEnabled = false
     private var timerARunMode = 0
     // starting value for timer A
     private var timerALatch: Int = 0x0000
     private var timerA: Int = 0x0000
+
+    private var crbValue: UByte = 0x00u
     private var timerBIRQEnabled = false
+    private var timerBEnabled = false
+    private var timerBRunMode = 0
     // starting value for timer B
     private var timerBLatch: Int = 0x0000
     private var timerB: Int = 0x0000
@@ -75,6 +80,7 @@ class CIA {
     fun cycle() {
         cycleTimeOfDayClock()
         cycleTimerA()
+        cycleTimerB()
     }
 
     private fun cycleTimeOfDayClock() {
@@ -100,13 +106,17 @@ class CIA {
 
                     val hour = timeOfDayClock.todHrs.bcdToInt()
                     var ampmFlag = timeOfDayClock.todHrs and 0b1000_0000u
-                    if (hour == 11) {
-                        ampmFlag = ampmFlag xor 0b1000_0000u
-                        timeOfDayClock.todHrs = (hour + 1).toUByte().toBcd() or ampmFlag
-                    } else if (hour == 12) {
-                        timeOfDayClock.todHrs = 0x01.toUByte() or ampmFlag
-                    } else {
-                        timeOfDayClock.todHrs = (hour + 1).toUByte().toBcd() or ampmFlag
+                    when (hour) {
+                        11 -> {
+                            ampmFlag = ampmFlag xor 0b1000_0000u
+                            timeOfDayClock.todHrs = (hour + 1).toUByte().toBcd() or ampmFlag
+                        }
+                        12 -> {
+                            timeOfDayClock.todHrs = 0x01.toUByte() or ampmFlag
+                        }
+                        else -> {
+                            timeOfDayClock.todHrs = (hour + 1).toUByte().toBcd() or ampmFlag
+                        }
                     }
                 } else {
                     timeOfDayClock.todMin = (minute + 1).toUByte().toBcd()
@@ -142,7 +152,29 @@ class CIA {
                 }
                 if (timerAIRQEnabled) {
                     // signal Timer A interrupt
-                    cpu.signalTimerAIRQ()
+                    cpu.signalTimerIRQ()
+                }
+            }
+        }
+    }
+
+    private fun cycleTimerB() {
+        if (timerBEnabled) {
+            //logger.info {"counting cycle down to $timerB"}
+            timerB--
+            if (timerB <= 0) {
+                // timer has reached 0
+                // --> set CIAICR: bit 1 (timer b count down to 0), bit 7 (IRQ)
+                ciaIcrState = ciaIcrState or 0b1000_0010u
+                // reset timer to latch
+                timerB = timerBLatch
+                if (timerBRunMode == 8) {
+                    // timer is in one-shot mode ==> stop timer
+                    timerBEnabled = false
+                }
+                if (timerBIRQEnabled) {
+                    // signal Timer B interrupt
+                    cpu.signalTimerIRQ()
                 }
             }
         }
@@ -165,6 +197,12 @@ class CIA {
             TIMER_A_HIGH -> {
                 return ((timerA and 0xFF00) shr 8).toUByte()
             }
+            TIMER_B_LOW -> {
+                return timerB.toUByte()
+            }
+            TIMER_B_HIGH -> {
+                return ((timerB and 0xFF00) shr 8).toUByte()
+            }
             TODTEN -> {
                 // unfreeze TOD clock
                 timeOfDaySaved = null
@@ -186,10 +224,12 @@ class CIA {
                 ciaIcrState = 0x00u
                 result
             }
-            /*CIACRA -> {
-                    // todo - implementation
-                    return 0x00.toUByte()
-                }*/
+            CIACRA -> {
+                return craValue
+            }
+            CIACRB -> {
+                return crbValue
+            }
             else -> {
                 // todo - implementation
                 logger.info { "missing IMPL for CIA1:read ${address.toHex()}" }
@@ -272,16 +312,23 @@ class CIA {
             timerAIRQEnabled = setMode
             logger.info {"timerAIRQEnabled: $timerAIRQEnabled"}
         }
+        // BIT 1: enable / disable Timer B interrupt
+        else if (byte.toInt() and 0b0000_0010 == 0b0000_0010) {
+            timerBIRQEnabled = setMode
+            logger.info {"timerBIRQEnabled: $timerBIRQEnabled"}
+        }
         // BIT 5-6 unused
         // check for missing implementation
-        if (byte.toInt() and 0b0001_1110 > 0) {
+        if (byte.toInt() and 0b0001_1100 > 0) {
             // todo: implementation
-            logger.warn { "not handled BITS for CIAICR register: ${(byte and 0b0001_1110u).toBinary()}" }
+            logger.warn { "not handled BITS for CIAICR register: ${(byte and 0b0001_1100u).toBinary()}" }
         }
     }
 
     private fun writeCIACRA(byte: UByte) {
         // logger.info { "write to CIACRA register: ${byte.toBinary()}" }
+        craValue = byte
+
         // BIT 0: start/stop Timer A
         timerAEnabled = byte.toInt() and 0b0000_0001 == 0b0000_0001
         logger.info {"timerAEnabled: $timerAEnabled"}
@@ -300,8 +347,23 @@ class CIA {
     }
 
     private fun writeCIACRB(byte: UByte) {
-        // logger.info {"write to CIACRB register: ${byte.toBinary()}"}
-        logger.warn { "not handled BITS for write CIACRB register: ${byte.toBinary()}" }
-        // todo: implementation
+        // logger.info { "write to CIACRB register: ${byte.toBinary()}" }
+        crbValue = byte
+
+        // BIT 0: start/stop Timer B
+        timerBEnabled = byte.toInt() and 0b0000_0001 == 0b0000_0001
+        logger.info { "timerBEnabled: $timerBEnabled" }
+        // BIT 3: Timer B run mode: 1=one-shot, 0=continous
+        timerBRunMode = byte.toInt() and 0b0000_1000
+        logger.info { "timerBRunMode: $timerBRunMode" }
+        // BIT 4: load latch Timer B
+        if (byte.toInt() and 0b0001_0000 == 0b0001_0000) {
+            timerB = timerBLatch
+        }
+        // check for missing implementation
+        if (byte.toInt() and 0b1110_0110 > 0) {
+            // todo: implementation
+            logger.warn { "not handled BITS for write CIACRB register: ${(byte and 0b1110_0110u).toBinary()}" }
+        }
     }
 }

@@ -181,7 +181,7 @@ class CPU {
         irqTypeSignaled = 4
     }
 
-    fun signalTimerAIRQ() {
+    fun signalTimerIRQ() {
         irqTypeSignaled = 1
     }
 
