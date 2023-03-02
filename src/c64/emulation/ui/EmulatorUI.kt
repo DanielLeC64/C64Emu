@@ -11,9 +11,11 @@ import mu.KLogging
 import org.apache.log4j.BasicConfigurator
 import org.apache.log4j.ConsoleAppender
 import org.apache.log4j.PatternLayout
+import java.awt.BorderLayout
 import java.awt.Dimension
 import java.util.Timer
 import javax.swing.JFrame
+import javax.swing.JPanel
 import kotlin.concurrent.schedule
 import kotlin.concurrent.timer
 
@@ -32,26 +34,33 @@ class EmulatorUI {
         BasicConfigurator.configure(ConsoleAppender(PatternLayout("%m%n")))
 
         val frame = JFrame()
-        frame.layout = null
+        frame.layout = BorderLayout()
         frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
-        frame.size = Dimension(VIC.PAL_RASTERCOLUMNS * 2, VIC.PAL_RASTERLINES * 2)
-        frame.isVisible = true
 
+        val bitmapPanel = JPanel()
+        // TODO: set visible screen area = viewport, e.g. x=76-470 (394px)  and y=16-286 (270px)
+        // TODO: calculate from viewport values
+        bitmapPanel.preferredSize = Dimension(VIC.PAL_RASTERCOLUMNS * 2, VIC.PAL_RASTERLINES * 2)
+        frame.contentPane.add(bitmapPanel, BorderLayout.CENTER)
+
+        frame.isVisible = true
+        frame.pack()
         frame.addKeyListener(keyboard)
 
         GlobalScope.launch {
             BootstrapC64()
         }
 
-        // 40ms ~= 25 frames/s
-        timer("display_refresh", false, 100, 40) {
-            frame.graphics.drawImage(vic.bitmapData, 0, 0,
+        // 20ms ~= 50 frames/s
+        timer("display_refresh", false, 100, 20) {
+            // TODO: calculate from viewport values
+            bitmapPanel.graphics.drawImage(vic.bitmapData, 0, 0,
                 vic.bitmapData.width * 2, vic.bitmapData.height * 2, frame)
         }
 
         // load basic test program
         Timer().schedule(3000) {
-            System.memory.loadPrg("./test-src/c64/prg/64 tester.prg")
+            System.memory.loadPrg("./test-src/c64/prg/interrupt1.prg")
         }
     }
 }

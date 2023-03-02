@@ -26,8 +26,29 @@ class VIC {
         val VIC_ADDRESS_SPACE = 0xD000..0xD02E
         val VIC_IO_AREA_SIZE = 47 //$D000-$D02E
 
+        // top vertical blank area 0-15 (16px)
+        const val V_BLANK_TOP: Int = 15
+        // top border 16-50 (35px)
+        const val BORDER_TOP: Int = 50
+        const val SCREEN_BOTTOM: Int = 250
+        // bottom border 251-299 (49px)
+        const val BORDER_BOTTOM: Int = 299
+        // bottom vertical blank area 300-311 (12px)
+        //const val V_BLANK_BOTTOM: Int = 311
+
+        // left horizontal blank area 0-75 (76px)
+        const val H_BLANK_LEFT: Int = 75
+        // left border 76-123 (48px)
+        const val BORDER_LEFT: Int = 123
+        const val SCREEN_RIGHT: Int = 443
+        // right border 443-480 (37px)
+        const val BORDER_RIGHT: Int = 480
+        // right horizontal blank area 481-503 (23px)
+        //const val H_BLANK_RIGHT: Int = 503
+
         const val PAL_RASTERLINES: Int = 312
-        const val PAL_RASTERCOLUMNS: Int = 367
+        const val PAL_RASTERCOLUMNS: Int = 504
+        // 504 columns with 8 column per cycle: 504 / 8 = 63 cycles
         const val PAL_CYCLES_PER_RASTERLINE: Int = 63
         const val PAL_CYCLES_PER_FRAME: Int = PAL_RASTERLINES * PAL_CYCLES_PER_RASTERLINE
 
@@ -133,7 +154,8 @@ class VIC {
         // display window from rasterline 51 - 250 (=200 lines)
         // display window from rastercolumn 24 - 343 (=320px)
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
-        val y: Int = rasterline - 51
+        // TODO: move this in the called methods
+        val y: Int = rasterline - BORDER_TOP - 1
         if (bitmapMode.toInt() == 0) {
             // text-mode
             rasterTextMode(rasterline, y)
@@ -162,12 +184,17 @@ class VIC {
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
-            if (rasterline < 51 || rasterline > 250 || rastercolumn < 24 || rastercolumn > 343) {
+            if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
+                rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
+                // blank area
+                color = 0x000000
+            } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
+                rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
                 // outer border color
                 color = borderColor
             } else {
                 // display window
-                val x = rastercolumn - 24
+                val x = rastercolumn - BORDER_LEFT - 1
                 val textCol = x / 8
                 val char = memory.fetch(screenMemoryRowAddress + textCol)
                 val charColor = COLOR_TABLE[memory.fetch(colorRamRowAddress + textCol).toInt() and 0b0000_1111]
