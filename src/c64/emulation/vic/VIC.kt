@@ -92,7 +92,8 @@ class VIC {
 
     init {
         logger.info { "init VIC" }
-        bitmapData = BufferedImage(PAL_RASTERCOLUMNS, PAL_RASTERLINES, BufferedImage.TYPE_3BYTE_BGR)
+        bitmapData =
+            BufferedImage(BORDER_RIGHT - H_BLANK_LEFT, BORDER_BOTTOM - V_BLANK_TOP, BufferedImage.TYPE_3BYTE_BGR)
         vicRam = UByteArray(VIC_IO_AREA_SIZE)
     }
 
@@ -187,7 +188,7 @@ class VIC {
             if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
                 rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
-                color = 0x000000
+                continue
             } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
                 rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
                 // outer border color
@@ -208,7 +209,7 @@ class VIC {
                 else
                     backgroundColor
             }
-            bitmapData.setRGB(rastercolumn, rasterline, color)
+            bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
         }
     }
 
@@ -228,11 +229,16 @@ class VIC {
             // hires bitmap mode
             for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
                 var color: Int
-                if (rasterline < 51 || rasterline > 250 || rastercolumn < 24 || rastercolumn > 343) {
+                if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
+                    rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
+                    // blank area
+                    continue
+                } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
+                    rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
                     // outer border color
                     color = borderColor
                 } else {
-                    val x = rastercolumn - 24
+                    val x = rastercolumn - BORDER_LEFT - 1
                     val textCol = x / 8
                     val pxBit = x and 0b0000_0111
                     val colors = memory.fetch(bitmapColorRowAddress + textCol).toInt()
@@ -250,18 +256,23 @@ class VIC {
                         bgColor
                     }
                 }
-                bitmapData.setRGB(rastercolumn, rasterline, color)
+                bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
             }
         } else {
             // todo - later merge code with code for hires...
             // multicolor bitmap mode
             for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
                 var color: Int
-                if (rasterline < 51 || rasterline > 250 || rastercolumn < 24 || rastercolumn > 343) {
+                if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
+                    rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
+                    // blank area
+                    continue
+                } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
+                    rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
                     // outer border color
                     color = borderColor
                 } else {
-                    val x = rastercolumn - 24
+                    val x = rastercolumn - BORDER_LEFT - 1
                     val textCol = x / 8
                     val pxBit = x and 0b0000_0110
                     val colors = memory.fetch(bitmapColorRowAddress + textCol).toInt()
@@ -289,7 +300,7 @@ class VIC {
                         }
                     }
                 }
-                bitmapData.setRGB(rastercolumn, rasterline, color)
+                bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
             }
         }
     }
