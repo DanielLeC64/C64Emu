@@ -86,9 +86,25 @@ class VIC {
         )
     }
 
+    private data class RastererState(
+        var charY: Int = 0,
+        var textRow: Int = 0,
+        var textRowAddr: Int = 0,
+        var textCol: Int = 0,
+        var colorRamRowAddress: Int = 0,
+        var backgroundColor: Int = 0,
+        var videoBankAddress: Int = 0,
+        var bitmapAddress: Int = 0,
+        var bitmapColorAddress: Int = 0,
+        var bitmapColorRowAddress: Int = 0,
+        var bitmapRowAddress: Int = 0,
+        var screenMemoryAddress: Int = 0
+    )
+
     private val vicRam: UByteArray
     val bitmapData: BufferedImage
     private var lastRasterLine: Int = 0
+    private val rastererState = RastererState()
 
     init {
         logger.info { "init VIC" }
@@ -152,39 +168,33 @@ class VIC {
     }
 
     private fun rasterLine(rasterline: Int) {
-        // display window from rasterline 51 - 250 (=200 lines)
-        // display window from rastercolumn 24 - 343 (=320px)
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
-        // TODO: move this in the called methods
         val y: Int = rasterline - BORDER_TOP - 1
-        if (bitmapMode.toInt() == 0) {
-            // text-mode
-            rasterTextMode(rasterline, y)
-        }
-        else {
-            // bitmap mode
-            rasterBitmapMode(rasterline, y)
-        }
-    }
-
-    private fun rasterTextMode(rasterline: Int, y: Int) {
-        // todo: multicolor text mode: set by bit 4 of $d016
-        // todo: Extended Background Color Mode
-        // todo: SCROLX bit 3 - 38/40 column mode
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
-        val backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
-        val screenMemoryAddress = getScreenMemoryAddress()
-        val videoBankAddress = getVideoBankAddress()
-        val fetchFromCharMemoryFunction = getFetchFromCharMemoryFunction()
-        val textRow = y / 8
-        val textRowAddr = textRow * 40
-        val charY = y.rem(8)
+        val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
 
-        val colorRamRowAddress = COLOR_RAM + textRowAddr
-        val screenMemoryRowAddress = videoBankAddress + screenMemoryAddress + textRowAddr
+        // popuplate rasterState
+        rastererState.charY = y.rem(8)
+        rastererState.textRow = y / 8
+        rastererState.textRowAddr = rastererState.textRow * 40
+        rastererState.colorRamRowAddress = COLOR_RAM + rastererState.textRowAddr
+        rastererState.backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+        rastererState.videoBankAddress = getVideoBankAddress()
+        rastererState.bitmapAddress = getBitmapAddress()
+        rastererState.bitmapColorAddress = getBitmapColorAddress()
+        rastererState.bitmapColorRowAddress =
+            rastererState.videoBankAddress + rastererState.bitmapColorAddress + rastererState.textRowAddr
+        rastererState.bitmapRowAddress =
+            rastererState.videoBankAddress + rastererState.bitmapAddress + rastererState.textRowAddr * 8 + rastererState.charY
+        rastererState.screenMemoryAddress = getScreenMemoryAddress()
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
+            val x = rastercolumn - BORDER_LEFT - 1
+
+            // popuplate rasterState
+            rastererState.textCol = x / 8
+
             if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
                 rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
@@ -194,113 +204,84 @@ class VIC {
                 // outer border color
                 color = borderColor
             } else {
-                // display window
-                val x = rastercolumn - BORDER_LEFT - 1
-                val textCol = x / 8
-                val char = memory.fetch(screenMemoryRowAddress + textCol)
-                val charColor = COLOR_TABLE[memory.fetch(colorRamRowAddress + textCol).toInt() and 0b0000_1111]
-
-                val charX = x and 0b0000_0111
-                // todo: small optimization possible - fetchFromVideoBank should be replaced
-                val rawCharData = fetchFromCharMemoryFunction(char.toInt() * 8 + charY)
-                val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
-                color = if (rawCharData and pixelMask == pixelMask)
-                    charColor
-                else
-                    backgroundColor
+                if (bitmapMode.toInt() == 0) {
+                    // text-mode
+                    // todo: multicolor text mode: set by bit 4 of $d016
+                    // todo: Extended Background Color Mode
+                    // todo: SCROLX bit 3 - 38/40 column mode
+                    color = rasterTextMode(x)
+                } else {
+                    // bitmap mode
+                    if (!isMulticolorMode){
+                        // hires bitmap mode
+                        color = rasterHiresMode(x)
+                    } else {
+                        // multicolor bitmap mode
+                        color = rasterColorMode(x)
+                    }
+                }
             }
             bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
         }
     }
 
-    private fun rasterBitmapMode(rasterline: Int, y: Int) {
-        val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
-        val videoBankAddress = getVideoBankAddress()
-        val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
-        val textRow = y / 8
-        val textRowAddr = textRow * 40
-        val charY = y.rem(8)
-        val bitmapColorRowAddress = videoBankAddress + getBitmapColorAddress() + textRowAddr
-        val bitmapRowAddress = videoBankAddress + getBitmapAddress() + textRowAddr * 8 + charY
-        val colorRamRowAddress = COLOR_RAM + textRowAddr
-        val backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+    private fun rasterTextMode(x: Int): Int {
+        val screenMemoryRowAddress = rastererState.videoBankAddress + rastererState.screenMemoryAddress + rastererState.textRowAddr
+        val char = memory.fetch(screenMemoryRowAddress + rastererState.textCol)
+        val charColor = COLOR_TABLE[memory.fetch(rastererState.colorRamRowAddress + rastererState.textCol).toInt() and 0b0000_1111]
+        val fetchFromCharMemoryFunction = getFetchFromCharMemoryFunction()
 
-        if (!isMulticolorMode) {
-            // hires bitmap mode
-            for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
-                var color: Int
-                if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
-                    rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
-                    // blank area
-                    continue
-                } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
-                    rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
-                    // outer border color
-                    color = borderColor
-                } else {
-                    val x = rastercolumn - BORDER_LEFT - 1
-                    val textCol = x / 8
-                    val pxBit = x and 0b0000_0111
-                    val colors = memory.fetch(bitmapColorRowAddress + textCol).toInt()
-                    // 8x8 colorblock - hi-nibble: pixel-color, lo-nibble: background-color
-                    val bgColor = COLOR_TABLE[colors and 0b0000_1111]
-                    val pxColor = COLOR_TABLE[colors and 0b1111_0000 shr 4]
+        val charX = x and 0b0000_0111
+        val rawCharData = fetchFromCharMemoryFunction(char.toInt() * 8 + rastererState.charY)
+        val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
+        return if (rawCharData and pixelMask == pixelMask)
+            charColor
+        else
+            rastererState.backgroundColor
+    }
 
-                    // get byte from bitmap
-                    val bitmapByte = memory.fetch(bitmapRowAddress + textCol * 8).toInt()
-                    // read the correct bit
-                    val bitTest = (0b1000_0000u shr pxBit).toInt()
-                    color = if (bitmapByte and bitTest == bitTest) {
-                        pxColor
-                    } else {
-                        bgColor
-                    }
-                }
-                bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
-            }
+    private fun rasterHiresMode(x: Int): Int {
+        val pxBit = x and 0b0000_0111
+        val colors = memory.fetch(rastererState.bitmapColorRowAddress + rastererState.textCol).toInt()
+        // 8x8 colorblock - hi-nibble: pixel-color, lo-nibble: background-color
+        val bgColor = COLOR_TABLE[colors and 0b0000_1111]
+        val pxColor = COLOR_TABLE[colors and 0b1111_0000 shr 4]
+
+        // get byte from bitmap
+        val bitmapByte = memory.fetch(rastererState.bitmapRowAddress + rastererState.textCol * 8).toInt()
+        // read the correct bit
+        val bitTest = (0b1000_0000u shr pxBit).toInt()
+        return if (bitmapByte and bitTest == bitTest) {
+            pxColor
         } else {
-            // todo - later merge code with code for hires...
-            // multicolor bitmap mode
-            for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
-                var color: Int
-                if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
-                    rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
-                    // blank area
-                    continue
-                } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
-                    rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
-                    // outer border color
-                    color = borderColor
-                } else {
-                    val x = rastercolumn - BORDER_LEFT - 1
-                    val textCol = x / 8
-                    val pxBit = x and 0b0000_0110
-                    val colors = memory.fetch(bitmapColorRowAddress + textCol).toInt()
-                    // 8x8 colorblock - hi-nibble: hi-color, lo-nibble: lo-color
-                    val lo_color = COLOR_TABLE[colors and 0b0000_1111]
-                    val hi_color = COLOR_TABLE[colors and 0b1111_0000 shr 4]
-                    val color_ram = COLOR_TABLE[memory.fetch(colorRamRowAddress + textCol).toInt() and 0b0000_1111]
+            bgColor
+        }
+    }
 
-                    // get byte from bitmap
-                    val bitmapByte = memory.fetch(bitmapRowAddress + textCol * 8).toInt()
-                    // read the correct bit
-                    val bitTest = (0b1100_0000u shr pxBit).toInt()
-                    color = when ((bitmapByte and bitTest) shr (6-pxBit)) {
-                        0b00 -> {
-                            backgroundColor
-                        }
-                        0b01 -> {
-                            hi_color
-                        }
-                        0b10 -> {
-                            lo_color
-                        }
-                        else -> {
-                            color_ram
-                        }
-                    }
-                }
-                bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
+    private fun rasterColorMode(x: Int): Int {
+        val pxBit = x and 0b0000_0110
+        val colors = memory.fetch(rastererState.bitmapColorRowAddress + rastererState.textCol).toInt()
+        // 8x8 colorblock - hi-nibble: hi-color, lo-nibble: lo-color
+        val lo_color = COLOR_TABLE[colors and 0b0000_1111]
+        val hi_color = COLOR_TABLE[colors and 0b1111_0000 shr 4]
+        val color_ram = COLOR_TABLE[memory.fetch(rastererState.colorRamRowAddress + rastererState.textCol).toInt() and 0b0000_1111]
+
+        // get byte from bitmap
+        val bitmapByte = memory.fetch(rastererState.bitmapRowAddress + rastererState.textCol * 8).toInt()
+        // read the correct bit
+        val bitTest = (0b1100_0000u shr pxBit).toInt()
+        return when ((bitmapByte and bitTest) shr (6 - pxBit)) {
+            0b00 -> {
+                rastererState.backgroundColor
+            }
+            0b01 -> {
+                hi_color
+            }
+            0b10 -> {
+                lo_color
+            }
+            else -> {
+                color_ram
             }
         }
     }

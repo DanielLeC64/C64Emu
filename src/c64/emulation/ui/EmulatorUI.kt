@@ -11,6 +11,7 @@ import org.apache.log4j.ConsoleAppender
 import org.apache.log4j.PatternLayout
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.Point
 import java.util.*
 import javax.swing.JFrame
 import javax.swing.JPanel
@@ -26,12 +27,10 @@ import kotlin.concurrent.timer
 class EmulatorUI {
 
     companion object {
-        const val VIEWPORT_LEFT: Int = 11
-        const val VIEWPORT_RIGHT: Int = 405
-        const val VIEWPORT_TOP: Int = 0
-        const val VIEWPORT_BOTTOM: Int = 270
-        const val VIEWPORT_WIDTH: Int = VIEWPORT_RIGHT - VIEWPORT_LEFT
-        const val VIEWPORT_HEIGHT: Int = VIEWPORT_BOTTOM - VIEWPORT_TOP
+        val VIEWPORT_TOP_LEFT: Point = Point(11, 0)
+        val VIEWPORT_BOTTOM_RIGHT: Point = Point(405, 270)
+        val VIEWPORT_WIDTH: Int = VIEWPORT_BOTTOM_RIGHT.x - VIEWPORT_TOP_LEFT.x
+        val VIEWPORT_HEIGHT: Int = VIEWPORT_BOTTOM_RIGHT.y - VIEWPORT_TOP_LEFT.y
     }
 
     init {
@@ -58,12 +57,12 @@ class EmulatorUI {
         timer("display_refresh", false, 100, 20) {
             bitmapPanel.graphics.drawImage(vic.bitmapData, 0, 0,
                 VIEWPORT_WIDTH * 2, VIEWPORT_HEIGHT * 2,
-                VIEWPORT_LEFT, VIEWPORT_TOP, VIEWPORT_RIGHT, VIEWPORT_BOTTOM, frame)
+                VIEWPORT_TOP_LEFT.x, VIEWPORT_TOP_LEFT.y, VIEWPORT_BOTTOM_RIGHT.x, VIEWPORT_BOTTOM_RIGHT.y, frame)
         }
 
         // load basic test program
         Timer().schedule(3000) {
-            System.memory.loadPrg("./test-src/c64/prg/s1 demo 1.prg")
+            System.memory.loadPrg("./test-src/c64/prg/interrupt1.prg")
         }
     }
 }
