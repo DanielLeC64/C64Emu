@@ -206,9 +206,11 @@ class VIC {
             } else {
                 if (bitmapMode.toInt() == 0) {
                     // text-mode
-                    // todo: multicolor text mode: set by bit 4 of $d016
-                    // todo: Extended Background Color Mode
+                    // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
+                    // todo: SCROLY bit 6 - Extended Background Color Mode
                     // todo: SCROLX bit 3 - 38/40 column mode
+                    // TODO: SCROLY bit 3 - 25/24 row mode 
+                    // TODO: SCROLY bit 4 - screen on/off
                     color = rasterTextMode(x)
                 } else {
                     // bitmap mode
