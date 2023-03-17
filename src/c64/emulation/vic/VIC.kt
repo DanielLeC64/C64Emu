@@ -2,6 +2,8 @@ package c64.emulation.vic
 
 import c64.emulation.System.memory
 import c64.emulation.System.registers
+import c64.util.toBinary
+import c64.util.toHex
 import mu.KotlinLogging
 import java.awt.image.BufferedImage
 import java.io.File
@@ -18,7 +20,6 @@ private val logger = KotlinLogging.logger {}
 @ExperimentalUnsignedTypes
 class VIC {
 
-    // TODO: handle interrupt status in $D019
     // TODO: set used video-bank (bit 0+1) in $DD00 (CIA2) (+$DD02 Port A data direction register)
 
     companion object {
@@ -124,14 +125,27 @@ class VIC {
         // translate address to $00-$2E
         vicRam[address - VIC_OFFSET] = byte
 
-        // todo - do we need this?
-        /*when (address and 0x000F) {
-            else -> {
-                // todo - implementation
-                logger.info { "missing IMPL for VIC:write ${address.toHex()}" }
-                0x00.toUByte()
+        // this is only to log writing to yet unhandled VIC registers
+        when (address) {
+            in 0xD000..0xD010,
+            // TODO: VIC_RASTER,
+            0xD013, 0xD014, 0xD015, 0xD017,
+            in 0xD019..0xD01F,
+            in 0xD022..0xD02E,
+            -> {
+                logger.info { "missing IMPL for VIC:write ${address.toHex()}: ${byte.toHex()} (${byte.toBinary()})" }
             }
-        }*/
+            VIC_SCROLY -> {
+                if (byte.toInt() and 0b1100_0111 > 0) {
+                    logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1100_0111u).toBinary()}" }
+                }
+            }
+            VIC_SCROLX -> {
+                if (byte.toInt() and 0b1110_0111 > 0) {
+                    logger.warn { "not handled BITS for VIC_SCROLX register: ${(byte and 0b1110_0111u).toBinary()}" }
+                }
+            }
+        }
     }
 
     /**
@@ -168,10 +182,30 @@ class VIC {
     }
 
     private fun rasterLine(rasterline: Int) {
+        // display enabled (DEN)
+        val displayEnabled = fetch(VIC_SCROLY).toInt() and 0b0001_0000 == 0b0001_0000
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
         val y: Int = rasterline - BORDER_TOP - 1
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
         val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
+
+        var borderTop = BORDER_TOP
+        var borderLeft = BORDER_LEFT
+        var screenBottom = SCREEN_BOTTOM
+        var screenRight = SCREEN_RIGHT
+
+        // 24 rows mode (RSEL)
+        if (fetch(VIC_SCROLY).toInt() and 0b0000_1000 == 0b0000_0000) {
+            // extend borders by 4px
+            borderTop += 4
+            screenBottom -= 4
+        }
+        // 38 columns mode (CSEL)
+        if (fetch(VIC_SCROLX).toInt() and 0b0000_1000 == 0b0000_0000) {
+            // extend left by 7px and right by 9px
+            borderLeft += 7
+            screenRight -= 9
+        }
 
         // popuplate rasterState
         rastererState.charY = y.rem(8)
@@ -199,8 +233,9 @@ class VIC {
                 rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
                 continue
-            } else if (rasterline <= BORDER_TOP || rasterline > SCREEN_BOTTOM ||
-                rastercolumn <= BORDER_LEFT || rastercolumn > SCREEN_RIGHT) {
+            } else if (!displayEnabled ||
+                rasterline <= borderTop || rasterline > screenBottom ||
+                rastercolumn <= borderLeft || rastercolumn > screenRight) {
                 // outer border color
                 color = borderColor
             } else {
@@ -208,9 +243,6 @@ class VIC {
                     // text-mode
                     // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
                     // todo: SCROLY bit 6 - Extended Background Color Mode
-                    // todo: SCROLX bit 3 - 38/40 column mode
-                    // TODO: SCROLY bit 3 - 25/24 row mode 
-                    // TODO: SCROLY bit 4 - screen on/off
                     color = rasterTextMode(x)
                 } else {
                     // bitmap mode
