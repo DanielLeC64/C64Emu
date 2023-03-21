@@ -28,24 +28,22 @@ class VIC {
         val VIC_IO_AREA_SIZE = 47 //$D000-$D02E
 
         // top vertical blank area 0-15 (16px)
-        const val V_BLANK_TOP: Int = 15
+        const val BORDER_TOP: Int = 16
         // top border 16-50 (35px)
-        const val BORDER_TOP: Int = 50
+        const val SCREEN_TOP: Int = 51
         const val SCREEN_BOTTOM: Int = 250
         // bottom border 251-299 (49px)
         const val BORDER_BOTTOM: Int = 299
         // bottom vertical blank area 300-311 (12px)
-        //const val V_BLANK_BOTTOM: Int = 311
 
         // left horizontal blank area 0-75 (76px)
-        const val H_BLANK_LEFT: Int = 75
+        const val BORDER_LEFT: Int = 76
         // left border 76-123 (48px)
-        const val BORDER_LEFT: Int = 123
+        const val SCREEN_LEFT: Int = 124
         const val SCREEN_RIGHT: Int = 443
         // right border 443-480 (37px)
         const val BORDER_RIGHT: Int = 480
         // right horizontal blank area 481-503 (23px)
-        //const val H_BLANK_RIGHT: Int = 503
 
         const val PAL_RASTERLINES: Int = 312
         const val PAL_RASTERCOLUMNS: Int = 504
@@ -110,7 +108,7 @@ class VIC {
     init {
         logger.info { "init VIC" }
         bitmapData =
-            BufferedImage(BORDER_RIGHT - H_BLANK_LEFT, BORDER_BOTTOM - V_BLANK_TOP, BufferedImage.TYPE_3BYTE_BGR)
+            BufferedImage(BORDER_RIGHT - BORDER_LEFT + 1, BORDER_BOTTOM - BORDER_TOP + 1, BufferedImage.TYPE_3BYTE_BGR)
         vicRam = UByteArray(VIC_IO_AREA_SIZE)
     }
 
@@ -185,25 +183,25 @@ class VIC {
         // display enabled (DEN)
         val displayEnabled = fetch(VIC_SCROLY).toInt() and 0b0001_0000 == 0b0001_0000
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
-        val y: Int = rasterline - BORDER_TOP - 1
+        val y: Int = rasterline - SCREEN_TOP
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
         val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
 
-        var borderTop = BORDER_TOP
-        var borderLeft = BORDER_LEFT
+        var screenTop = SCREEN_TOP
+        var screenLeft = SCREEN_LEFT
         var screenBottom = SCREEN_BOTTOM
         var screenRight = SCREEN_RIGHT
 
         // 24 rows mode (RSEL)
         if (fetch(VIC_SCROLY).toInt() and 0b0000_1000 == 0b0000_0000) {
             // extend borders by 4px
-            borderTop += 4
+            screenTop += 4
             screenBottom -= 4
         }
         // 38 columns mode (CSEL)
         if (fetch(VIC_SCROLX).toInt() and 0b0000_1000 == 0b0000_0000) {
             // extend left by 7px and right by 9px
-            borderLeft += 7
+            screenLeft += 7
             screenRight -= 9
         }
 
@@ -224,18 +222,18 @@ class VIC {
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
-            val x = rastercolumn - BORDER_LEFT - 1
+            val x = rastercolumn - SCREEN_LEFT
 
             // popuplate rasterState
             rastererState.textCol = x / 8
 
-            if (rasterline <= V_BLANK_TOP || rasterline > BORDER_BOTTOM ||
-                rastercolumn <= H_BLANK_LEFT || rastercolumn > BORDER_RIGHT) {
+            if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
+                rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
                 continue
             } else if (!displayEnabled ||
-                rasterline <= borderTop || rasterline > screenBottom ||
-                rastercolumn <= borderLeft || rastercolumn > screenRight) {
+                rasterline < screenTop || rasterline > screenBottom ||
+                rastercolumn < screenLeft || rastercolumn > screenRight) {
                 // outer border color
                 color = borderColor
             } else {
@@ -255,7 +253,7 @@ class VIC {
                     }
                 }
             }
-            bitmapData.setRGB(rastercolumn - H_BLANK_LEFT - 1, rasterline - V_BLANK_TOP - 1, color)
+            bitmapData.setRGB(rastercolumn - BORDER_LEFT, rasterline - BORDER_TOP, color)
         }
     }
 
