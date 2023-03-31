@@ -24,8 +24,8 @@ class VIC {
 
     companion object {
         val VIC_OFFSET = 0xD000
-        val VIC_ADDRESS_SPACE = 0xD000..0xD02E
-        val VIC_IO_AREA_SIZE = 47 //$D000-$D02E
+        val VIC_ADDRESS_SPACE = 0xD000..0xD3FF
+        val VIC_IO_AREA_SIZE = 64 //$D000-$D03F
 
         // top vertical blank area 0-15 (16px)
         const val BORDER_TOP: Int = 16
@@ -57,10 +57,18 @@ class VIC {
         ///////////////////////////////////////////
         // registers are from $D000-D3FF, repeating every 64bytes 16x ($D000, $D040, $D080,...)
         ///////////////////////////////////////////
+        // y-coordinate sprite n
+        const val VIC_SPRITE_X = 0xD000
+        // y-coordinate sprite n
+        const val VIC_SPRITE_Y = 0xD001
+        // MSB x-coordinate sprite 0-7
+        const val VIC_SPRITE_X_MSB = 0xD010
         // Vertical Fine Scrolling and Control Register
         const val VIC_SCROLY = 0xD011
         // Read Current Raster Scan Line/Write Line to Compare for Raster IRQ
         const val VIC_RASTER = 0xD012
+        // sprite enabled
+        const val VIC_SPRITE_ENABLED = 0xD015
         // Horizontal Fine Scrolling and Control Register
         const val VIC_SCROLX = 0xD016
         // Chip Memory Control Register
@@ -86,6 +94,7 @@ class VIC {
     }
 
     private data class RastererState(
+        var y: Int = 0,
         var charY: Int = 0,
         var textRow: Int = 0,
         var textRowAddr: Int = 0,
@@ -120,14 +129,14 @@ class VIC {
      * Stores a single byte at the given VIC address.
      */
     fun store(address: Int, byte: UByte) {
-        // translate address to $00-$2E
-        vicRam[address - VIC_OFFSET] = byte
+        // translate address to $00-$3F
+        vicRam[address and 0b0011_1111] = byte
 
         // this is only to log writing to yet unhandled VIC registers
         when (address) {
             in 0xD000..0xD010,
             // TODO: VIC_RASTER,
-            0xD013, 0xD014, 0xD015, 0xD017,
+            0xD013, 0xD014, VIC_SPRITE_ENABLED, 0xD017,
             in 0xD019..0xD01F,
             in 0xD022..0xD02E,
             -> {
@@ -150,17 +159,8 @@ class VIC {
      * Fetches a single byte from the given VIC address.
      */
     fun fetch(address: Int): UByte {
-        // translate address to $00-$2E
-        return vicRam[address - VIC_OFFSET]
-
-        // todo - do we need this?
-        // use only bit 0-4, mask out all higher bits
-        /*when (address and 0x000F) {
-            else -> {
-                logger.info { "missing IMPL for VIC:read ${address.toHex()}" }
-                return vicRam[address and 0x000F]
-            }
-        }*/
+        // translate address to $00-$3F
+        return vicRam[address and 0b0011_1111]
     }
 
     internal fun refresh() {
@@ -183,7 +183,6 @@ class VIC {
         // display enabled (DEN)
         val displayEnabled = fetch(VIC_SCROLY).toInt() and 0b0001_0000 == 0b0001_0000
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
-        val y: Int = rasterline - SCREEN_TOP
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
         val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
 
@@ -206,8 +205,9 @@ class VIC {
         }
 
         // popuplate rasterState
-        rastererState.charY = y.rem(8)
-        rastererState.textRow = y / 8
+        rastererState.y = rasterline - SCREEN_TOP
+        rastererState.charY = rastererState.y.rem(8)
+        rastererState.textRow = rastererState.y / 8
         rastererState.textRowAddr = rastererState.textRow * 40
         rastererState.colorRamRowAddress = COLOR_RAM + rastererState.textRowAddr
         rastererState.backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
@@ -222,10 +222,6 @@ class VIC {
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
-            val x = rastercolumn - SCREEN_LEFT
-
-            // popuplate rasterState
-            rastererState.textCol = x / 8
 
             if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
                 rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
@@ -237,21 +233,25 @@ class VIC {
                 // outer border color
                 color = borderColor
             } else {
-                if (bitmapMode.toInt() == 0) {
+                val x = rastercolumn - SCREEN_LEFT
+                // popuplate rasterState
+                rastererState.textCol = x / 8
+                color = if (bitmapMode.toInt() == 0) {
                     // text-mode
                     // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
                     // todo: SCROLY bit 6 - Extended Background Color Mode
-                    color = rasterTextMode(x)
+                    rasterTextMode(x)
                 } else {
                     // bitmap mode
                     if (!isMulticolorMode){
                         // hires bitmap mode
-                        color = rasterHiresMode(x)
+                        rasterHiresMode(x)
                     } else {
                         // multicolor bitmap mode
-                        color = rasterColorMode(x)
+                        rasterColorMode(x)
                     }
                 }
+                color = rasterSprites(x, color)
             }
             bitmapData.setRGB(rastercolumn - BORDER_LEFT, rasterline - BORDER_TOP, color)
         }
@@ -316,6 +316,44 @@ class VIC {
                 color_ram
             }
         }
+    }
+
+    private fun rasterSprites(x: Int, color: Int): Int {
+
+        var spriteColor = color
+        // TODO: later enable all sprites
+        for (spriteNum in 0..1) {
+            // check whether sprite is visible
+            if ((fetch(VIC_SPRITE_ENABLED).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001) {
+
+                // get position
+                var spriteX = fetch(VIC_SPRITE_X + 2 * spriteNum).toInt()
+                // add MSB for x-coordinate
+                // first mask out MSB for spriteNum:  shr + and %0000_0001
+                // then shift it by 8 to the left
+                spriteX += (((fetch(VIC_SPRITE_X_MSB).toInt() shr spriteNum) and 0b0000_0001) shl 8)
+                var spriteY = fetch(VIC_SPRITE_Y + 2 * spriteNum).toInt()
+
+                // TODO: is this correct?
+                // calc position in visible screen
+                spriteX += 24
+                spriteY += 50
+
+                // TODO: get size of the sprite ($D017+$D01D)
+                var spriteW = 24
+                var spriteH = 21
+
+                if (spriteX >= x && (spriteX + spriteW) <= x &&
+                    spriteY >= rastererState.y && (spriteY + spriteH) <= rastererState.y)
+                {
+                    spriteColor = COLOR_TABLE[3]
+                }
+
+                // TODO: check whether x+y are part of the sprite
+            }
+        }
+
+        return spriteColor
     }
 
     private fun getVideoBank(): Int {
