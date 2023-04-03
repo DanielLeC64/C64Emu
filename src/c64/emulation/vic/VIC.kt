@@ -321,8 +321,7 @@ class VIC {
     private fun rasterSprites(x: Int, color: Int): Int {
 
         var spriteColor = color
-        // TODO: later enable all sprites
-        for (spriteNum in 0..1) {
+        for (spriteNum in 0..7) {
             // check whether sprite is visible
             if ((fetch(VIC_SPRITE_ENABLED).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001) {
 
@@ -336,17 +335,17 @@ class VIC {
 
                 // TODO: is this correct?
                 // calc position in visible screen
-                spriteX += 24
-                spriteY += 50
+                spriteX -= 24
+                spriteY -= 50
 
                 // TODO: get size of the sprite ($D017+$D01D)
                 var spriteW = 24
                 var spriteH = 21
 
-                if (spriteX >= x && (spriteX + spriteW) <= x &&
-                    spriteY >= rastererState.y && (spriteY + spriteH) <= rastererState.y)
+                if (spriteX <= x && x <= (spriteX + spriteW) &&
+                    spriteY <= rastererState.y && rastererState.y <= (spriteY + spriteH))
                 {
-                    spriteColor = COLOR_TABLE[3]
+                    spriteColor = COLOR_TABLE[2]
                 }
 
                 // TODO: check whether x+y are part of the sprite
