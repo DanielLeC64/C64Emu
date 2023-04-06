@@ -62,7 +62,7 @@ class EmulatorUI {
 
         // load basic test program
         Timer().schedule(3000) {
-            System.memory.loadPrg("./test-src/c64/prg/64 tester.prg")
+            System.memory.loadPrg("./test-src/c64/prg/simple sprite.prg")
         }
     }
 }
