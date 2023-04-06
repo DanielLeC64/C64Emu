@@ -57,9 +57,9 @@ class VIC {
         ///////////////////////////////////////////
         // registers are from $D000-D3FF, repeating every 64bytes 16x ($D000, $D040, $D080,...)
         ///////////////////////////////////////////
-        // y-coordinate sprite n
+        // Sprite n Horizontal Position ($D000-D00F)
         const val VIC_SPRITE_X = 0xD000
-        // y-coordinate sprite n
+        // Sprite n Vertical Position ($D000-D00F)
         const val VIC_SPRITE_Y = 0xD001
         // MSB x-coordinate sprite 0-7
         const val VIC_SPRITE_X_MSB = 0xD010
@@ -67,16 +67,34 @@ class VIC {
         const val VIC_SCROLY = 0xD011
         // Read Current Raster Scan Line/Write Line to Compare for Raster IRQ
         const val VIC_RASTER = 0xD012
-        // sprite enabled
-        const val VIC_SPRITE_ENABLED = 0xD015
+        // Sprite Enable Register
+        const val VIC_SPENA = 0xD015
         // Horizontal Fine Scrolling and Control Register
         const val VIC_SCROLX = 0xD016
+        // Sprite Vertical Expansion Register
+        const val VIC_YXPAND = 0xD017
         // Chip Memory Control Register
         const val VIC_VMCSB = 0xD018
+        // Sprite Multicolor Registers
+        const val VIC_SPMC = 0xD01C
+        // Sprite Horizontal Expansion Register
+        const val VIC_XXPAND = 0xD01D
         // Border Color Register
         const val VIC_EXTCOL = 0xD020
         // Background Color 0
-        const val VIC_BGCOL1 = 0xD021
+        const val VIC_BGCOL0 = 0xD021
+        // Background Color 1
+        const val VIC_BGCOL1 = 0xD022
+        // Background Color 2
+        const val VIC_BGCOL2 = 0xD023
+        // Background Color 3
+        const val VIC_BGCOL3 = 0xD024
+        // Sprite Multicolor Register 0
+        const val VIC_SPMC0 = 0xD025
+        // Sprite Multicolor Register 1
+        const val VIC_SPMC1 = 0xD026
+        // Sprite n Color Register ($D027-D02E)
+        const val VIC_SPCOL = 0xD027
 
         // color ram $D800-DBFF
         const val COLOR_RAM = 0xD800
@@ -134,11 +152,12 @@ class VIC {
 
         // this is only to log writing to yet unhandled VIC registers
         when (address) {
-            in 0xD000..0xD010,
             // TODO: VIC_RASTER,
-            0xD013, 0xD014, VIC_SPRITE_ENABLED, 0xD017,
-            in 0xD019..0xD01F,
-            in 0xD022..0xD02E,
+            0xD013, 0xD014,
+            in 0xD019..0xD01B,
+            in 0xD01E..0xD01F,
+            in 0xD022..0xD026,
+            in 0xD02F..0xD03F,
             -> {
                 logger.info { "missing IMPL for VIC:write ${address.toHex()}: ${byte.toHex()} (${byte.toBinary()})" }
             }
@@ -210,7 +229,7 @@ class VIC {
         rastererState.textRow = rastererState.y / 8
         rastererState.textRowAddr = rastererState.textRow * 40
         rastererState.colorRamRowAddress = COLOR_RAM + rastererState.textRowAddr
-        rastererState.backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+        rastererState.backgroundColor = COLOR_TABLE[fetch(VIC_BGCOL0).toInt() and 0b0000_1111]
         rastererState.videoBankAddress = getVideoBankAddress()
         rastererState.bitmapAddress = getBitmapAddress()
         rastererState.bitmapColorAddress = getBitmapColorAddress()
@@ -321,34 +340,63 @@ class VIC {
     private fun rasterSprites(x: Int, color: Int): Int {
 
         var spriteColor = color
-        for (spriteNum in 0..7) {
+        for (spriteNum in 7 downTo 0) {
             // check whether sprite is visible
-            if ((fetch(VIC_SPRITE_ENABLED).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001) {
+            if ((fetch(VIC_SPENA).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001) {
 
                 // get position
-                var spriteX = fetch(VIC_SPRITE_X + 2 * spriteNum).toInt()
+                var spritePosX = fetch(VIC_SPRITE_X + 2 * spriteNum).toInt()
                 // add MSB for x-coordinate
                 // first mask out MSB for spriteNum:  shr + and %0000_0001
                 // then shift it by 8 to the left
-                spriteX += (((fetch(VIC_SPRITE_X_MSB).toInt() shr spriteNum) and 0b0000_0001) shl 8)
-                var spriteY = fetch(VIC_SPRITE_Y + 2 * spriteNum).toInt()
+                spritePosX += (((fetch(VIC_SPRITE_X_MSB).toInt() shr spriteNum) and 0b0000_0001) shl 8)
+                var spritePosY = fetch(VIC_SPRITE_Y + 2 * spriteNum).toInt()
 
-                // TODO: is this correct?
                 // calc position in visible screen
-                spriteX -= 24
-                spriteY -= 50
+                spritePosX -= 24
+                spritePosY -= 50
 
-                // TODO: get size of the sprite ($D017+$D01D)
                 var spriteW = 24
                 var spriteH = 21
 
-                if (spriteX <= x && x <= (spriteX + spriteW) &&
-                    spriteY <= rastererState.y && rastererState.y <= (spriteY + spriteH))
-                {
-                    spriteColor = COLOR_TABLE[2]
+                // Sprite Horizontal Expansion
+                val xxpand = (fetch(VIC_XXPAND).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001
+                if (xxpand) {
+                    spriteW *= 2
+                }
+                // Sprite Vertical Expansion
+                val yxpand = (fetch(VIC_YXPAND).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001
+                if (yxpand) {
+                    spriteH *= 2
                 }
 
-                // TODO: check whether x+y are part of the sprite
+                if (spritePosX <= x && x < (spritePosX + spriteW) &&
+                    spritePosY <= rastererState.y && rastererState.y < (spritePosY + spriteH))
+                {
+                    val spriteX = x - spritePosX
+                    val spriteY = rastererState.y - spritePosY
+                    // sprite pointer addresses from $07F8-$07FF (respecting videobank + block)
+                    val spritePointerAddress = rastererState.videoBankAddress +
+                            rastererState.screenMemoryAddress + 0xF8 + spriteNum
+                    val spriteAddress = rastererState.videoBankAddress + 64 * memory.fetch(spritePointerAddress).toInt()
+                    // get byte from bitmap
+                    val spriteByteAddress = spriteAddress + spriteY * 3 + spriteX / 8
+
+                    val multiColorMode = (fetch(VIC_SPMC).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001
+                    if (multiColorMode) {
+                        // multicolor mode
+                        // TODO: implementation
+                    }
+                    else {
+                        // hires mode
+                        val pxBit = spriteX and 0b0000_0111
+                        // read the correct bit
+                        val bitTest = (0b1000_0000u shr pxBit).toInt()
+                        if (memory.fetch(spriteByteAddress).toInt() and bitTest == bitTest) {
+                            spriteColor = COLOR_TABLE[fetch(VIC_SPCOL + spriteNum).toInt() and 0b0000_1111]
+                        }
+                    }
+                }
             }
         }
 
