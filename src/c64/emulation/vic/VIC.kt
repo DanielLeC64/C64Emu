@@ -377,7 +377,7 @@ class VIC {
                     val spriteY = rastererState.y - spritePosY
                     // sprite pointer addresses from $07F8-$07FF (respecting videobank + block)
                     val spritePointerAddress = rastererState.videoBankAddress +
-                            rastererState.screenMemoryAddress + 0xF8 + spriteNum
+                            rastererState.screenMemoryAddress + 0x3F8 + spriteNum
                     val spriteAddress = rastererState.videoBankAddress + 64 * memory.fetch(spritePointerAddress).toInt()
                     // get byte from bitmap
                     val spriteByteAddress = spriteAddress + spriteY * 3 + spriteX / 8
