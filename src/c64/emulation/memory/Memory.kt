@@ -29,17 +29,17 @@ class Memory {
         const val CPU_PORT_ADDR: Int = 0x0001
 
         val KERNAL_ADDRESS_SPACE = 0xE000..0xFFFF
-        const val KERNAL_FILE: String = "./roms/kernal"
+        const val KERNAL_FILE: String = "/kernal"
         const val KERNAL_OFFSET: Int = 0xE000
         const val KERNAL_SIZE: Int = 8192
 
         val BASIC_ADDRESS_SPACE = 0xA000..0xBFFF
-        const val BASIC_FILE: String = "./roms/basic"
+        const val BASIC_FILE: String = "/basic"
         const val BASIC_OFFSET: Int = 0xA000
         const val BASIC_SIZE: Int = 8192
 
         val CHARGEN_ADDRESS_SPACE = 0xD000..0xDFFF
-        const val CHARGEN_FILE: String = "./roms/chargen"
+        const val CHARGEN_FILE: String = "/chargen"
         const val CHARGEN_OFFSET: Int = 0xD000
         const val CHARGEN_SIZE: Int = 4096
 
@@ -89,6 +89,7 @@ class Memory {
         }
     }
 
+    private val romsPath: String
     private val ram: UByteArray
     private val ioDevicesRam: UByteArray
     private val basicRom: UByteArray
@@ -97,15 +98,16 @@ class Memory {
 
     init {
         logger.info { "init Memory with size of <$MEM_SIZE> byte." }
+        romsPath = System.getProperty("romsPath", "./roms")
         ram = UByteArray(MEM_SIZE)
         ioDevicesRam = UByteArray(CHARGEN_SIZE)
         charGenRom = UByteArray(CHARGEN_SIZE)
         basicRom = UByteArray(BASIC_SIZE)
         kernalRom = UByteArray(KERNAL_SIZE)
-        logger.info { "loading kernal, basic, chargen" }
-        load(kernalRom, KERNAL_FILE, 0, KERNAL_SIZE)
-        load(basicRom, BASIC_FILE, 0, BASIC_SIZE)
-        load(charGenRom, CHARGEN_FILE, 0, CHARGEN_SIZE)
+        logger.info { "loading kernal, basic, chargen from romsPath <$romsPath>" }
+        load(kernalRom, romsPath + KERNAL_FILE, 0, KERNAL_SIZE)
+        load(basicRom, romsPath + BASIC_FILE, 0, BASIC_SIZE)
+        load(charGenRom, romsPath + CHARGEN_FILE, 0, CHARGEN_SIZE)
     }
 
     fun loadPrg(filename: String) {
