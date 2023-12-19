@@ -27,7 +27,7 @@ import kotlin.concurrent.timer
 class EmulatorUI {
 
     companion object {
-        var prgToLoad: String = "./test-src/c64/prg/64 tester.prg"
+        var prgToLoad: String = "./src/test/resources/prg/64 tester.prg"
         val VIEWPORT_TOP_LEFT: Point = Point(11, 0)
         val VIEWPORT_BOTTOM_RIGHT: Point = Point(405, 270)
         val VIEWPORT_WIDTH: Int = VIEWPORT_BOTTOM_RIGHT.x - VIEWPORT_TOP_LEFT.x
