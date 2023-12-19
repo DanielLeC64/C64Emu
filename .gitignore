@@ -25,4 +25,8 @@ hs_err_pid*
 # idea project settings
 .idea/
 
+# gradle
+.gradle/
+
 out/
+build/
