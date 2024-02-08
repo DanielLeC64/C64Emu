@@ -373,8 +373,14 @@ class VIC {
                 if (spritePosX <= x && x < (spritePosX + spriteW) &&
                     spritePosY <= rastererState.y && rastererState.y < (spritePosY + spriteH))
                 {
-                    val spriteX = x - spritePosX
-                    val spriteY = rastererState.y - spritePosY
+                    var spriteX = x - spritePosX
+                    if (xxpand) {
+                        spriteX /= 2
+                    }
+                    var spriteY = rastererState.y - spritePosY
+                    if (yxpand) {
+                        spriteY /= 2
+                    }
                     // sprite pointer addresses from $07F8-$07FF (respecting videobank + block)
                     val spritePointerAddress = rastererState.videoBankAddress +
                             rastererState.screenMemoryAddress + 0x3F8 + spriteNum
