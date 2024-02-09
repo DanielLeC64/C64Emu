@@ -392,6 +392,7 @@ class VIC {
                     if (multiColorMode) {
                         // multicolor mode
                         // TODO: implementation
+                        logger.info { "missing multicolor sprite implemenation" }
                     }
                     else {
                         // hires mode

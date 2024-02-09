@@ -14,6 +14,20 @@ repositories {
 
 application {
     mainClass.set("c64.emulation.ui.EmulatorUIKt")
+    applicationDefaultJvmArgs = listOf("-DromsPath=%APP_HOME%/roms")
+}
+
+task("startScript") {
+}
+
+distributions {
+    main {
+        contents {
+            from("/roms") {
+                into("roms")
+            }
+        }
+    }
 }
 
 dependencies {
