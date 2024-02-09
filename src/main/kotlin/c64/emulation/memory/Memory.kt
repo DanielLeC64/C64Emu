@@ -16,9 +16,9 @@ private val logger = KotlinLogging.logger {}
 /**
  * Class which encapsulates all operations on memory.
  *
- * @author Daniel Schulte 2017-2023
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
+@OptIn(ExperimentalUnsignedTypes::class)
 class Memory {
 
     companion object {

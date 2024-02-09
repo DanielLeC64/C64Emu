@@ -4,7 +4,7 @@ package c64.emulation.cpu
 /**
  * Clock - helper to get the right timing handled. It runs with a resolution of 1 millisecond.
  *
- * @author Daniel Schulte 2017-2021
+ * @author Daniel Schulte 2017-2024
  */
 class Clock {
 

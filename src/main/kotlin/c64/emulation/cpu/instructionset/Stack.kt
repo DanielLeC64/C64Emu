@@ -7,9 +7,8 @@ import c64.emulation.System.registers
 /**
  * Class collecting all "Stack" instructions.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Stack {
 
     init {

@@ -12,9 +12,8 @@ private val logger = KotlinLogging.logger {}
 /**
  * Class which handles debugging
  *
- * @author schulted
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Debugger(private var disassembly: Disassembly) {
 
     companion object {

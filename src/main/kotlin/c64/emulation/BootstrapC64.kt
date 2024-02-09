@@ -5,9 +5,8 @@ import mu.KotlinLogging
 /**
  * Bootstrapper for C64 emulator.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class BootstrapC64 {
 
     private val logger = KotlinLogging.logger {}
@@ -23,7 +22,6 @@ class BootstrapC64 {
     }
 }
 
-@ExperimentalUnsignedTypes
 fun main (args : Array<String>) {
     BootstrapC64()
 }

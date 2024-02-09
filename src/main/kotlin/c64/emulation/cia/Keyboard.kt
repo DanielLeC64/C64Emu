@@ -8,13 +8,12 @@ import java.awt.event.KeyListener
 /**
  * Class which handles Keyboard input and translates the incoming keyCodes for the CIA.
  *
- * @author Daniel Schulte 2017-2021
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Keyboard : KeyListener {
 
     companion object {
-        val SHIFT_CODE = 0xFF
+        const val SHIFT_CODE = 0xFF
         val keyboardTranslationMatrix = arrayOf(
             //         DEL   RET   C-RI  F7    F1    F3    F5    C-DO
             intArrayOf(0x08, 0x0A, 0x27, 0x76, 0x70, 0x72, 0x74, 0x28),

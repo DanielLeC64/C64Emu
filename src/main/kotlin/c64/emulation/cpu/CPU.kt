@@ -18,18 +18,15 @@ private val logger = KotlinLogging.logger {}
 // alias for "Instruction" functions
 typealias Instruction = () -> Unit
 
-@ExperimentalUnsignedTypes
 typealias InstructionWithArgAndResult = (value: UByte) -> UByte
 
-@ExperimentalUnsignedTypes
 typealias InstructionWithArg = (value: UByte) -> Unit
 
 /**
  * Emulator for CPU MOS 6510/8500.
  *
- * @author Daniel Schulte 2017-2023
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class CPU {
 
     private data class OpCodeInfo(val instruction: Instruction)

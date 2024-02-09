@@ -8,11 +8,10 @@ private val logger = KotlinLogging.logger {}
 
 /**
  * This class handles all MOS 6510/8500 processor registers.
- * Additional this class contains a cycle counter.
+ * Additionally, this class contains a cycle counter.
  *
- * @author Daniel Schulte 2017-2018
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Registers {
     companion object {
         const val DEBUG_MACHINE_STATE_HEADER: String = " PC   AC XR YR SP   NV-BDIZC  CY"

@@ -15,9 +15,9 @@ private val logger = KotlinLogging.logger {}
  * Emulation of the C64 video chip VIC-II - MOS 6567/6569.
  * Emulation only for PAL!
  *
- * @author Daniel Schulte 2017-2023
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
+@OptIn(ExperimentalUnsignedTypes::class)
 class VIC {
 
     // TODO: set used video-bank (bit 0+1) in $DD00 (CIA2) (+$DD02 Port A data direction register)

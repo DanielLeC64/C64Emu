@@ -7,9 +7,8 @@ import c64.emulation.cpu.AddressingMode
 /**
  * Class collecting all "Arithmetic" instructions.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Arithmetic {
 
     init {

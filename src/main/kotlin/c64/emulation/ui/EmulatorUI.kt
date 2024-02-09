@@ -21,9 +21,8 @@ import kotlin.concurrent.timer
 /**
  * Simple UI to show the display of the emulator.
  *
- * @author Daniel Schulte 2017-2023
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class EmulatorUI {
 
     companion object {
@@ -68,7 +67,6 @@ class EmulatorUI {
     }
 }
 
-@ExperimentalUnsignedTypes
 fun main(args: Array<String>) {
     if (args.isNotEmpty()) {
         EmulatorUI.prgToLoad = args[0]

@@ -11,9 +11,8 @@ import c64.util.toUnprefixedHex
 /**
  * Class wich can be used to disassemble code.
  *
- * @author Daniel Schulte 2017-2018
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Disassembly {
 
     class DisassembleInfo(val op: String, val addrMode: AddressingMode)

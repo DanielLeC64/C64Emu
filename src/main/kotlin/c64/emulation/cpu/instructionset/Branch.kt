@@ -8,9 +8,8 @@ import c64.emulation.memory.Memory.Companion.checkForPageBoundaryCross
 /**
  * Class collecting all "Branch" instructions.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class Branch {
 
     init {

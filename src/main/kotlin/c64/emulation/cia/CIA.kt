@@ -14,9 +14,8 @@ private val logger = KotlinLogging.logger {}
 /**
  * Emulation of the C64 Complex Interface Adapter (CIA 6526).
  *
- * @author Daniel Schulte 2017-2023
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 class CIA {
 
     private data class TimeOfDayClock(

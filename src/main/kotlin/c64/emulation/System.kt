@@ -12,9 +12,8 @@ import c64.emulation.vic.VIC
  * Class which holds all parts of the emulated machine (CPU, VIC, ...) and initialize them in
  * the right order.
  *
- * @author Daniel Schulte 2017-2019
+ * @author Daniel Schulte 2017-2024
  */
-@ExperimentalUnsignedTypes
 object System {
 
     internal var registers = Registers()
