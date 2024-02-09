@@ -14,12 +14,14 @@ repositories {
 
 application {
     mainClass.set("c64.emulation.ui.EmulatorUIKt")
-    applicationDefaultJvmArgs = listOf("-DromsPath=%APP_HOME%/roms")
+    applicationDefaultJvmArgs = listOf("-DromsPath=ROMS_PARENT_DIR/roms")
 }
 
-task("startScript") {
+tasks.withType<CreateStartScripts>().configureEach {
+    doLast {
+        windowsScript.writeText(windowsScript.readText().replace("ROMS_PARENT_DIR", "%APP_HOME%"))
+    }
 }
-
 distributions {
     main {
         contents {
