@@ -391,8 +391,21 @@ class VIC {
                     val multiColorMode = (fetch(VIC_SPMC).toInt() shr spriteNum) and 0b0000_0001 == 0b0000_0001
                     if (multiColorMode) {
                         // multicolor mode
-                        // TODO: implementation
-                        logger.info { "missing multicolor sprite implemenation" }
+                        // get shiftCount, 6,4,2 or 0
+                        val shiftPxBy = (spriteX.inv() and 0b0000_0110)
+                        // read the correct bits (use only the two lowest bits)
+                        val pxColorBits = (memory.fetch(spriteByteAddress).toInt() shr shiftPxBy) and 0b0000_0011
+                        // %00 = transparent
+                        if (pxColorBits == 0b0000_0010) {
+                            // %10 = sprite-color
+                            spriteColor = COLOR_TABLE[fetch(VIC_SPCOL + spriteNum).toInt() and 0b0000_1111]
+                        } else if (pxColorBits == 0b0000_0001) {
+                            // %01 = multicolor #0 (VIC_SPMC0)
+                            spriteColor = COLOR_TABLE[fetch(VIC_SPMC0).toInt() and 0b0000_1111]
+                        } else if (pxColorBits == 0b0000_0011) {
+                            // %11 = multicolor #1 (VIC_SPMC1)
+                            spriteColor = COLOR_TABLE[fetch(VIC_SPMC1).toInt() and 0b0000_1111]
+                        }
                     }
                     else {
                         // hires mode
