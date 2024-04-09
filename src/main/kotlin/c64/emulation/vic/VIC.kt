@@ -167,8 +167,8 @@ class VIC {
                 }
             }
             VIC_SCROLX -> {
-                if (byte.toInt() and 0b1110_0111 > 0) {
-                    logger.warn { "not handled BITS for VIC_SCROLX register: ${(byte and 0b1110_0111u).toBinary()}" }
+                if (byte.toInt() and 0b0010_0000 > 0) {
+                    logger.warn { "not handled BITS for VIC_SCROLX register: ${(byte and 0b0010_0000u).toBinary()}" }
                 }
             }
         }
@@ -241,9 +241,10 @@ class VIC {
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
+            var scrolX = 0
 
             if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
-                rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
+                rastercolumn < BORDER_LEFT || (rastercolumn + scrolX) > BORDER_RIGHT) {
                 // blank area
                 continue
             } else if (!displayEnabled ||
@@ -253,6 +254,7 @@ class VIC {
                 color = borderColor
             } else {
                 val x = rastercolumn - SCREEN_LEFT
+                scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
                 // popuplate rasterState
                 rastererState.textCol = x / 8
                 color = if (bitmapMode.toInt() == 0) {
@@ -272,7 +274,7 @@ class VIC {
                 }
                 color = rasterSprites(x, color)
             }
-            bitmapData.setRGB(rastercolumn - BORDER_LEFT, rasterline - BORDER_TOP, color)
+            bitmapData.setRGB(rastercolumn - BORDER_LEFT + scrolX, rasterline - BORDER_TOP, color)
         }
     }
 
