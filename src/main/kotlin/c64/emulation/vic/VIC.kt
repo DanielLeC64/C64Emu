@@ -162,8 +162,8 @@ class VIC {
                 logger.info { "missing IMPL for VIC:write ${address.toHex()}: ${byte.toHex()} (${byte.toBinary()})" }
             }
             VIC_SCROLY -> {
-                if (byte.toInt() and 0b1100_0111 > 0) {
-                    logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1100_0111u).toBinary()}" }
+                if (byte.toInt() and 0b1100_0000 > 0) {
+                    logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1100_0000u).toBinary()}" }
                 }
             }
             VIC_SCROLX -> {
@@ -242,16 +242,18 @@ class VIC {
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
             var scrolX = 0
+            var scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
 
             if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
-                rastercolumn < BORDER_LEFT || (rastercolumn + scrolX) > BORDER_RIGHT) {
+                rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
                 continue
             } else if (!displayEnabled ||
-                rasterline < screenTop || rasterline > screenBottom ||
+                (rasterline + scrolY) < screenTop || rasterline > screenBottom ||
                 rastercolumn < screenLeft || rastercolumn > screenRight) {
                 // outer border color
                 color = borderColor
+                scrolY = 0
             } else {
                 val x = rastercolumn - SCREEN_LEFT
                 scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
@@ -274,7 +276,7 @@ class VIC {
                 }
                 color = rasterSprites(x, color)
             }
-            bitmapData.setRGB(rastercolumn - BORDER_LEFT + scrolX, rasterline - BORDER_TOP, color)
+            bitmapData.setRGB(rastercolumn - BORDER_LEFT + scrolX, rasterline + scrolY - BORDER_TOP, color)
         }
     }
 
