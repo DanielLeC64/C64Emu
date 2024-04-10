@@ -242,21 +242,26 @@ class VIC {
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
             var scrolX = 0
-            var scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
+            var scrolY = 0
 
             if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
                 rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
                 // blank area
                 continue
             } else if (!displayEnabled ||
-                (rasterline + scrolY) < screenTop || rasterline > screenBottom ||
+                rasterline < screenTop || rasterline > screenBottom ||
                 rastercolumn < screenLeft || rastercolumn > screenRight) {
                 // outer border color
                 color = borderColor
-                scrolY = 0
             } else {
                 val x = rastercolumn - SCREEN_LEFT
                 scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
+                scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
+                // check top and bottom borders
+                if ((rasterline + scrolY) < screenTop ||
+                    (rasterline + scrolY) > screenBottom) {
+                    continue
+                }
                 // popuplate rasterState
                 rastererState.textCol = x / 8
                 color = if (bitmapMode.toInt() == 0) {
