@@ -257,10 +257,25 @@ class VIC {
                 val x = rastercolumn - SCREEN_LEFT
                 scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
                 scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
+
+                // on reset
+                // - 38 col modus on (left 7px reduced)
+                // - +5px SCROLX
+                // - first 5px correct, 2px blank, starting with 1st px
+                // TODO: 38cols mode muss bei SCROLX berücksichtigt werden
+                // TODO: 24rows mode muss bei SCROLY berücksichtigt werden
+                // TODO: erste pixel müssen bei SCROLX oder SCROLY trotzdem gelöscht werden
+
+
                 // check top and bottom borders
                 if ((rasterline + scrolY) < screenTop ||
-                    (rasterline + scrolY) > screenBottom) {
+                    (rasterline + scrolY) > screenBottom ||
+                    (rastercolumn + scrolX) < screenLeft ||
+                    (rastercolumn + scrolX) > screenRight) {
                     continue
+                    //color = 0xFF0000
+                    //scrolX = 0
+                    //scrolY = 0
                 }
                 // popuplate rasterState
                 rastererState.textCol = x / 8
@@ -271,7 +286,7 @@ class VIC {
                     rasterTextMode(x)
                 } else {
                     // bitmap mode
-                    if (!isMulticolorMode){
+                    if (!isMulticolorMode) {
                         // hires bitmap mode
                         rasterHiresMode(x)
                     } else {
