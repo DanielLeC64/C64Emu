@@ -223,9 +223,11 @@ class VIC {
             screenRight -= 9
         }
 
+        val scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
+
         // popuplate rasterState
-        rastererState.y = rasterline - SCREEN_TOP
-        rastererState.charY = rastererState.y.rem(8)
+        rastererState.y = rasterline - SCREEN_TOP - scrolY
+        rastererState.charY = if (rastererState.y >= 0) rastererState.y.rem(8) else 0
         rastererState.textRow = rastererState.y / 8
         rastererState.textRowAddr = rastererState.textRow * 40
         rastererState.colorRamRowAddress = COLOR_RAM + rastererState.textRowAddr
@@ -241,8 +243,6 @@ class VIC {
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
-            var scrolX = 0
-            var scrolY = 0
 
             if (rasterline < BORDER_TOP || rasterline > BORDER_BOTTOM ||
                 rastercolumn < BORDER_LEFT || rastercolumn > BORDER_RIGHT) {
@@ -254,29 +254,9 @@ class VIC {
                 // outer border color
                 color = borderColor
             } else {
-                val x = rastercolumn - SCREEN_LEFT
-                scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
-                scrolY = -3 + (fetch(VIC_SCROLY).toInt() and 0b0000_0111)
+                val scrolX = fetch(VIC_SCROLX).toInt() and 0b0000_0111
+                val x = rastercolumn - SCREEN_LEFT - scrolX
 
-                // on reset
-                // - 38 col modus on (left 7px reduced)
-                // - +5px SCROLX
-                // - first 5px correct, 2px blank, starting with 1st px
-                // TODO: 38cols mode muss bei SCROLX berücksichtigt werden
-                // TODO: 24rows mode muss bei SCROLY berücksichtigt werden
-                // TODO: erste pixel müssen bei SCROLX oder SCROLY trotzdem gelöscht werden
-
-
-                // check top and bottom borders
-                if ((rasterline + scrolY) < screenTop ||
-                    (rasterline + scrolY) > screenBottom ||
-                    (rastercolumn + scrolX) < screenLeft ||
-                    (rastercolumn + scrolX) > screenRight) {
-                    continue
-                    //color = 0xFF0000
-                    //scrolX = 0
-                    //scrolY = 0
-                }
                 // popuplate rasterState
                 rastererState.textCol = x / 8
                 color = if (bitmapMode.toInt() == 0) {
@@ -296,7 +276,7 @@ class VIC {
                 }
                 color = rasterSprites(x, color)
             }
-            bitmapData.setRGB(rastercolumn - BORDER_LEFT + scrolX, rasterline + scrolY - BORDER_TOP, color)
+            bitmapData.setRGB(rastercolumn - BORDER_LEFT, rasterline - BORDER_TOP, color)
         }
     }
 
