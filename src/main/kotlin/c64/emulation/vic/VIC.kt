@@ -259,7 +259,10 @@ class VIC {
 
                 // popuplate rasterState
                 rastererState.textCol = x / 8
-                color = if (bitmapMode.toInt() == 0) {
+                color = if (rastererState.y > 199) {
+                    // check for rendering on bottom with SCROLY=0..2, in this case we are out of the rendering area
+                    rastererState.backgroundColor
+                } else if (bitmapMode.toInt() == 0) {
                     // text-mode
                     // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
                     // todo: SCROLY bit 6 - Extended Background Color Mode
