@@ -1,6 +1,8 @@
 package c64.emulation.cia
 
+import c64.emulation.System
 import c64.emulation.System.cpu
+import c64.emulation.cpu.CPU
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.KeyListener
@@ -136,8 +138,8 @@ class Keyboard : KeyListener {
                     lastKeyCode = keyboardAltTranslation[lastKeyCode]!!
                 }
                 if (lastKeyCode == KeyEvent.VK_R) {
-                    // TODO: implement ALT-R for resetting the machine 
-                    println("system reset")
+                    // ALT-R -> soft reset
+                    System.registers.PC = System.memory.fetchWord(CPU.RESET_VECTOR)
                 }
             }
             else {
