@@ -135,6 +135,10 @@ class Keyboard : KeyListener {
                 if (keyboardAltTranslation.containsKey(lastKeyCode)) {
                     lastKeyCode = keyboardAltTranslation[lastKeyCode]!!
                 }
+                if (lastKeyCode == KeyEvent.VK_R) {
+                    // TODO: implement ALT-R for resetting the machine 
+                    println("system reset")
+                }
             }
             else {
                 if (keyboardTranslationShiftState.contains(lastKeyCode)) {
