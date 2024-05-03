@@ -3,6 +3,7 @@ package c64.emulation.cia
 import c64.emulation.System
 import c64.emulation.System.cpu
 import c64.emulation.cpu.CPU
+import java.awt.Component
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.KeyListener
@@ -60,9 +61,12 @@ class Keyboard : KeyListener {
         val keyboardAltTranslationShiftState = hashSetOf(KeyEvent.VK_8, KeyEvent.VK_9)
         val keyboardAltTranslation = hashMapOf(
             KeyEvent.VK_8 to 0x3A,
-            KeyEvent.VK_9 to 0x3B
-        )
+            KeyEvent.VK_9 to 0x3B)
     }
+
+    private var pastedText: String = ""
+    private var sourceComponent: Component? = null
+    private var waitForDataPortA: UByte = 0u
 
     // todo: keys to translate:  CMD SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
     // todo: refactor and use charCode where possible
@@ -71,6 +75,20 @@ class Keyboard : KeyListener {
     private var lastKeyCode: Int = -1
 
     fun getDataPortB(dataPortA: UByte): UByte {
+        if (pastedText.isNotEmpty() && dataPortA == waitForDataPortA) {
+            println("--- ${dataPortA}, ${lastKeyCode}")
+            if (waitForDataPortA.toUInt() == 255u) {
+                /*if (lastKeyCode == -1) {
+                    pasteNextChar()
+                }*/
+                waitForDataPortA = 0u
+            }
+            else if (waitForDataPortA.toUInt() == 0u) {
+                waitForDataPortA = 255u
+                //lastKeyCode = -1
+                pasteNextChar()
+            }
+        }
         var result = 0
         if (lastKeyCode > -1) {
             var column = 0
@@ -165,5 +183,33 @@ class Keyboard : KeyListener {
 
     override fun keyTyped(e: KeyEvent?) {
         // nothing
+    }
+
+    fun pasteText(pastedText: String, sourceComponent: Component) {
+        println("---- paste text <${pastedText}>")
+        this.pastedText = pastedText
+        this.sourceComponent = sourceComponent
+        pasteNextChar()
+    }
+    private fun pasteNextChar() {
+        if (pastedText.isNotEmpty()) {
+            // TODO: sort out characters not between a-zA-Z0-9 and available special chars on c64
+            // TODO: respect shift state for upper characters
+            var nextChar: Char? = pastedText[0]
+            var validChar = (nextChar in 'A'..'Z') ||
+                    nextChar in 'a'..'z' ||
+                    nextChar in '0'..'9'
+            while (!validChar) {
+                nextChar = pastedText[0]
+
+            }
+            val e = KeyEvent(sourceComponent, 0, 0, 0, pastedText[0].code, Char(0))
+            pastedText = pastedText.substring(1)
+            this.waitForDataPortA = 255u
+            keyPressed(e)
+        }
+        else {
+            exit(0)
+        }
     }
 }
