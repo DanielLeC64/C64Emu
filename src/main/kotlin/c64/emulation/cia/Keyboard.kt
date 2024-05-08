@@ -3,10 +3,15 @@ package c64.emulation.cia
 import c64.emulation.System
 import c64.emulation.System.cpu
 import c64.emulation.cpu.CPU
+import mu.KotlinLogging
 import java.awt.Component
+import java.awt.Toolkit
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.KeyListener
+import kotlin.system.exitProcess
 
 /**
  * Class which handles Keyboard input and translates the incoming keyCodes for the CIA.
@@ -14,6 +19,8 @@ import java.awt.event.KeyListener
  * @author Daniel Schulte 2017-2024
  */
 class Keyboard : KeyListener {
+
+    private val logger = KotlinLogging.logger {}
 
     companion object {
         const val SHIFT_CODE = 0xFF
@@ -65,7 +72,7 @@ class Keyboard : KeyListener {
     }
 
     private var pastedText: String = ""
-    private var sourceComponent: Component? = null
+    var sourceComponent: Component? = null
     private var waitForDataPortA: UByte = 0u
 
     // todo: keys to translate:  CMD SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
@@ -122,6 +129,7 @@ class Keyboard : KeyListener {
 
     override fun keyPressed(e: KeyEvent?) {
         if (e != null) {
+            println(e)
             shiftState = -1
             lastKeyCode = e.keyCode
             val shiftDown = e.modifiersEx and InputEvent.SHIFT_DOWN_MASK == InputEvent.SHIFT_DOWN_MASK
@@ -159,6 +167,10 @@ class Keyboard : KeyListener {
                     // ALT-R -> soft reset
                     System.registers.PC = System.memory.fetchWord(CPU.RESET_VECTOR)
                 }
+                else if (lastKeyCode == KeyEvent.VK_INSERT) {
+                    // ALT-INSERT -> paste clipboard
+                    pasteFromClipboard()
+                }
             }
             else {
                 if (keyboardTranslationShiftState.contains(lastKeyCode)) {
@@ -185,31 +197,50 @@ class Keyboard : KeyListener {
         // nothing
     }
 
-    fun pasteText(pastedText: String, sourceComponent: Component) {
-        println("---- paste text <${pastedText}>")
+    fun pasteFromClipboard() {
+        try {
+            val c: Transferable = Toolkit.getDefaultToolkit().systemClipboard.getContents(null)
+            if (c.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                val content: Any? = c.getTransferData(DataFlavor.stringFlavor)
+                if (content != null) {
+                    pasteText(content.toString())
+                }
+            }
+        }
+        catch (e: Exception) {
+            println(e)
+        }
+    }
+
+    private fun pasteText(pastedText: String) {
+        logger.info {"paste text <${pastedText}>"}
         this.pastedText = pastedText
-        this.sourceComponent = sourceComponent
         pasteNextChar()
     }
+
     private fun pasteNextChar() {
         if (pastedText.isNotEmpty()) {
-            // TODO: sort out characters not between a-zA-Z0-9 and available special chars on c64
-            // TODO: respect shift state for upper characters
-            var nextChar: Char? = pastedText[0]
-            var validChar = (nextChar in 'A'..'Z') ||
-                    nextChar in 'a'..'z' ||
-                    nextChar in '0'..'9'
-            while (!validChar) {
-                nextChar = pastedText[0]
-
+            pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
+            var modifiers = 0
+            var nextChar: Char = pastedText[0]
+            if (nextChar in 'A'..'Z') {
+                modifiers = InputEvent.SHIFT_DOWN_MASK
             }
-            val e = KeyEvent(sourceComponent, 0, 0, 0, pastedText[0].code, Char(0))
+            else if (hashSetOf('!', '"').contains(nextChar)) {
+                nextChar =
+            }
+            else if (nextChar in 'a'..'z') {
+                nextChar = nextChar.minus(0x20)
+            }
+            // TODO: allow also special chars on c64
+            // abc123 ABC!"#$%&()*+,-./:;<>=?@XXX
+            val e = KeyEvent(sourceComponent, 0, 0, modifiers, nextChar.code, Char(0))
             pastedText = pastedText.substring(1)
             this.waitForDataPortA = 255u
             keyPressed(e)
         }
         else {
-            exit(0)
+            exitProcess(0)
         }
     }
 }

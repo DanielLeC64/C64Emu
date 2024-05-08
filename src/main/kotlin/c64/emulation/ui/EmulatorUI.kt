@@ -12,9 +12,6 @@ import org.apache.log4j.PatternLayout
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Point
-import java.awt.Toolkit
-import java.awt.datatransfer.DataFlavor
-import java.awt.datatransfer.Transferable
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.util.*
@@ -53,22 +50,12 @@ class EmulatorUI {
 
         frame.isVisible = true
         frame.pack()
+        keyboard.sourceComponent = frame
         frame.addKeyListener(keyboard)
         frame.addMouseListener(object: MouseAdapter() {
             override fun mousePressed(e: MouseEvent?) {
                 if (SwingUtilities.isRightMouseButton(e)) {
-                    try {
-                        val c: Transferable = Toolkit.getDefaultToolkit().systemClipboard.getContents(null)
-                        if (c.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-                            val content: Any? = c.getTransferData(DataFlavor.stringFlavor)
-                            if (content != null) {
-                                keyboard.pasteText(content.toString(), frame)
-                            }
-                        }
-                    }
-                    catch (e: Exception) {
-                        println(e)
-                    }
+                    keyboard.pasteFromClipboard()
                 }
             }
         })
