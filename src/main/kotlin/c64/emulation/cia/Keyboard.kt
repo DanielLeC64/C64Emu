@@ -136,8 +136,7 @@ class Keyboard : KeyListener {
             val altDown = e.modifiersEx and InputEvent.ALT_DOWN_MASK == InputEvent.ALT_DOWN_MASK
             if (shiftDown) {
                 if (lastKeyCode in KeyEvent.VK_A..KeyEvent.VK_Z ||
-                    lastKeyCode in KeyEvent.VK_1..KeyEvent.VK_2 ||
-                    lastKeyCode in KeyEvent.VK_4..KeyEvent.VK_6 ||
+                    lastKeyCode in KeyEvent.VK_1..KeyEvent.VK_6 ||
                     lastKeyCode in KeyEvent.VK_8..KeyEvent.VK_9) {
                     // keys A-Z, 1-2, 4-6, 8-9
                     // ==> normal shift handling
@@ -223,15 +222,27 @@ class Keyboard : KeyListener {
             pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
             var modifiers = 0
             var nextChar: Char = pastedText[0]
+
+            println("char code for <${nextChar}>: ${nextChar.code}")
+
             if (nextChar in 'A'..'Z') {
                 modifiers = InputEvent.SHIFT_DOWN_MASK
             }
-            else if (hashSetOf('!', '"').contains(nextChar)) {
-                nextChar =
+            //else if (hashSetOf('!', '"','#').contains(nextChar)) {
+            else if (nextChar in '!'..')') {
+                // TODO: use translation table charCode -> keycode
+                modifiers = InputEvent.SHIFT_DOWN_MASK
+                nextChar = nextChar.plus(0x10)
             }
+            /*else if (nextChar in '('..')') {
+                modifiers = InputEvent.SHIFT_DOWN_MASK
+                // 40 -> 56
+            }*/
             else if (nextChar in 'a'..'z') {
                 nextChar = nextChar.minus(0x20)
             }
+
+
             // TODO: allow also special chars on c64
             // abc123 ABC!"#$%&()*+,-./:;<>=?@XXX
             val e = KeyEvent(sourceComponent, 0, 0, modifiers, nextChar.code, Char(0))
