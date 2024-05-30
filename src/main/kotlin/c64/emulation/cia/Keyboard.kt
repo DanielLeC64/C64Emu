@@ -75,7 +75,7 @@ class Keyboard : KeyListener {
     var sourceComponent: Component? = null
     private var waitForDataPortA: UByte = 0u
 
-    // todo: keys to translate:  CMD SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
+    // todo: keys to translate:  C= SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
     // todo: refactor and use charCode where possible
 
     private var shiftState: Int = -1
@@ -83,7 +83,6 @@ class Keyboard : KeyListener {
 
     fun getDataPortB(dataPortA: UByte): UByte {
         if (pastedText.isNotEmpty() && dataPortA == waitForDataPortA) {
-            println("--- ${dataPortA}, ${lastKeyCode}")
             if (waitForDataPortA.toUInt() == 255u) {
                 /*if (lastKeyCode == -1) {
                     pasteNextChar()
@@ -129,7 +128,6 @@ class Keyboard : KeyListener {
 
     override fun keyPressed(e: KeyEvent?) {
         if (e != null) {
-            println(e)
             shiftState = -1
             lastKeyCode = e.keyCode
             val shiftDown = e.modifiersEx and InputEvent.SHIFT_DOWN_MASK == InputEvent.SHIFT_DOWN_MASK
@@ -212,46 +210,48 @@ class Keyboard : KeyListener {
     }
 
     private fun pasteText(pastedText: String) {
-        logger.info {"paste text <${pastedText}>"}
-        this.pastedText = pastedText
+        logger.info {"pasting text <${pastedText}>"}
+        this.pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
         pasteNextChar()
     }
 
     private fun pasteNextChar() {
         if (pastedText.isNotEmpty()) {
-            pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
             var modifiers = 0
             var nextChar: Char = pastedText[0]
 
-            println("char code for <${nextChar}>: ${nextChar.code}")
+            var keyChar = Char(0)
+
+            // TODO: use translation table charCode -> keycode
+            // abc123 ABC!"#$%&()*+,-./:;<>=?@XXX abccdf
 
             if (nextChar in 'A'..'Z') {
                 modifiers = InputEvent.SHIFT_DOWN_MASK
             }
-            //else if (hashSetOf('!', '"','#').contains(nextChar)) {
             else if (nextChar in '!'..')') {
-                // TODO: use translation table charCode -> keycode
                 modifiers = InputEvent.SHIFT_DOWN_MASK
                 nextChar = nextChar.plus(0x10)
             }
-            /*else if (nextChar in '('..')') {
-                modifiers = InputEvent.SHIFT_DOWN_MASK
-                // 40 -> 56
-            }*/
             else if (nextChar in 'a'..'z') {
                 nextChar = nextChar.minus(0x20)
             }
+            else if (nextChar == '<') {
+                nextChar = nextChar.plus(0x5d)
+            }
+            else if (nextChar == '>') {
+                nextChar = nextChar.plus(0x5b)
+                modifiers = InputEvent.SHIFT_DOWN_MASK
+            }
+            else if (nextChar == '?') {
+                nextChar = '?'
+                keyChar = '?'
+                modifiers = InputEvent.SHIFT_DOWN_MASK
+            }
 
-
-            // TODO: allow also special chars on c64
-            // abc123 ABC!"#$%&()*+,-./:;<>=?@XXX
-            val e = KeyEvent(sourceComponent, 0, 0, modifiers, nextChar.code, Char(0))
-            pastedText = pastedText.substring(1)
+            val e = KeyEvent(sourceComponent, 0, 0, modifiers, nextChar.code, keyChar)
+            pastedText = if (pastedText.length > 1) pastedText.substring(1) else ""
             this.waitForDataPortA = 255u
             keyPressed(e)
-        }
-        else {
-            exitProcess(0)
         }
     }
 }
