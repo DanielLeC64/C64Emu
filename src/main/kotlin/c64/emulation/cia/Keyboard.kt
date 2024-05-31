@@ -2,7 +2,11 @@ package c64.emulation.cia
 
 import c64.emulation.System
 import c64.emulation.System.cpu
+import c64.emulation.System.memory
+import c64.emulation.System.registers
+import c64.emulation.System.vic
 import c64.emulation.cpu.CPU
+import c64.emulation.vic.VIC
 import mu.KotlinLogging
 import java.awt.Component
 import java.awt.Toolkit
@@ -11,7 +15,6 @@ import java.awt.datatransfer.Transferable
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.KeyListener
-import kotlin.system.exitProcess
 
 /**
  * Class which handles Keyboard input and translates the incoming keyCodes for the CIA.
@@ -73,7 +76,6 @@ class Keyboard : KeyListener {
 
     private var pastedText: String = ""
     var sourceComponent: Component? = null
-    private var waitForDataPortA: UByte = 0u
 
     // todo: keys to translate:  C= SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
     // todo: refactor and use charCode where possible
@@ -82,19 +84,6 @@ class Keyboard : KeyListener {
     private var lastKeyCode: Int = -1
 
     fun getDataPortB(dataPortA: UByte): UByte {
-        if (pastedText.isNotEmpty() && dataPortA == waitForDataPortA) {
-            if (waitForDataPortA.toUInt() == 255u) {
-                /*if (lastKeyCode == -1) {
-                    pasteNextChar()
-                }*/
-                waitForDataPortA = 0u
-            }
-            else if (waitForDataPortA.toUInt() == 0u) {
-                waitForDataPortA = 255u
-                //lastKeyCode = -1
-                pasteNextChar()
-            }
-        }
         var result = 0
         if (lastKeyCode > -1) {
             var column = 0
@@ -162,7 +151,7 @@ class Keyboard : KeyListener {
                 }
                 if (lastKeyCode == KeyEvent.VK_R) {
                     // ALT-R -> soft reset
-                    System.registers.PC = System.memory.fetchWord(CPU.RESET_VECTOR)
+                    System.registers.PC = memory.fetchWord(CPU.RESET_VECTOR)
                 }
                 else if (lastKeyCode == KeyEvent.VK_INSERT) {
                     // ALT-INSERT -> paste clipboard
@@ -209,49 +198,56 @@ class Keyboard : KeyListener {
         }
     }
 
+    /**
+     * Pastes the text from the clipboard on the C64 screen. This only works, if the system is in textmode.
+     * The operation itself sets the screencodes directly in the screen-memory without triggering any keyboard events.
+     */
     private fun pasteText(pastedText: String) {
+        // characters for testing:  abc123 ABC!"#$%&()*+,-./:;<>=?@XXX abccdf
         logger.info {"pasting text <${pastedText}>"}
         this.pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
-        pasteNextChar()
+        if (pastedText.isNotEmpty()) {
+            val bitmapMode = memory.fetch(VIC.VIC_SCROLY) and 0b0010_0000u
+            // do pasting only in textmode
+            if (bitmapMode.toInt() == 0) {
+                var screenMemoryAddress = vic.getVideoBankAddress() + vic.getScreenMemoryAddress()
+                // find cursor position + screenmem address
+                val row = memory.fetch(0xD6)
+                val col = memory.fetch(0xD3)
+                var cursorAddress = row.toInt() * 40 + col.toInt()
+                // adjust screen memory address according to the cursor pos
+                screenMemoryAddress += cursorAddress
+
+                for (i in pastedText.indices) {
+                    memory.store(screenMemoryAddress + i, petscii2screencode(pastedText[i]).code.toUByte())
+                }
+                // set cursor to the end of the pasted text
+                cursorAddress += pastedText.length
+                // set row
+                memory.store(0xD6, (1 + cursorAddress / 40).toUByte())
+                // set col
+                memory.store(0xD3, (cursorAddress % 40).toUByte())
+
+                // TODO: 58732 ($E56C) 	Cursorposition (und Bildschirm- und Farb-RAM-Zeiger) setzen; Werte in Speicheradresse 211 ($D3), 214 ($D6) (Zeile, Spalte) vorgeben
+                memory.pushWordToStack(registers.PC)
+                //memory.pushToStack(registers.getProcessorStatus())
+                registers.PC = 0xE56C
+                //registers.PC = 0xFFF0
+            }
+        }
     }
 
-    private fun pasteNextChar() {
-        if (pastedText.isNotEmpty()) {
-            var modifiers = 0
-            var nextChar: Char = pastedText[0]
-
-            var keyChar = Char(0)
-
-            // TODO: use translation table charCode -> keycode
-            // abc123 ABC!"#$%&()*+,-./:;<>=?@XXX abccdf
-
-            if (nextChar in 'A'..'Z') {
-                modifiers = InputEvent.SHIFT_DOWN_MASK
+    private fun petscii2screencode(char: Char): Char {
+        return when (char) {
+            in 'a'..'z' -> {
+                char.minus(0x60)
             }
-            else if (nextChar in '!'..')') {
-                modifiers = InputEvent.SHIFT_DOWN_MASK
-                nextChar = nextChar.plus(0x10)
+            '@' -> {
+                Char(0)
             }
-            else if (nextChar in 'a'..'z') {
-                nextChar = nextChar.minus(0x20)
+            else -> {
+                char
             }
-            else if (nextChar == '<') {
-                nextChar = nextChar.plus(0x5d)
-            }
-            else if (nextChar == '>') {
-                nextChar = nextChar.plus(0x5b)
-                modifiers = InputEvent.SHIFT_DOWN_MASK
-            }
-            else if (nextChar == '?') {
-                nextChar = '?'
-                keyChar = '?'
-                modifiers = InputEvent.SHIFT_DOWN_MASK
-            }
-
-            val e = KeyEvent(sourceComponent, 0, 0, modifiers, nextChar.code, keyChar)
-            pastedText = if (pastedText.length > 1) pastedText.substring(1) else ""
-            this.waitForDataPortA = 255u
-            keyPressed(e)
         }
     }
 }

@@ -434,7 +434,7 @@ class VIC {
         return (memory.fetch(0xDD00) and 0b0000_0011u).toInt()
     }
 
-    private fun getVideoBankAddress(): Int {
+    fun getVideoBankAddress(): Int {
         // select video bank + translate address
         // vic bank
         // 0: bank 3 $C000-$FFFF
@@ -461,7 +461,7 @@ class VIC {
         }
     }
 
-    private fun getScreenMemoryAddress(): Int {
+    fun getScreenMemoryAddress(): Int {
         return 0x0400 * ((fetch(VIC_VMCSB) and 0b1111_0000u).toInt() shr 4)
     }
 
