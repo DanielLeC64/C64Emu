@@ -156,7 +156,6 @@ class VIC {
             0xD013, 0xD014,
             in 0xD019..0xD01B,
             in 0xD01E..0xD01F,
-            in 0xD022..0xD026,
             in 0xD02F..0xD03F,
             -> {
                 logger.info { "missing IMPL for VIC:write ${address.toHex()}: ${byte.toHex()} (${byte.toBinary()})" }
@@ -266,6 +265,9 @@ class VIC {
                     // text-mode
                     // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
                     // todo: SCROLY bit 6 - Extended Background Color Mode
+                    // todo: implement handling of VIC_BGCOL1
+                    // todo: implement handling of VIC_BGCOL2
+                    // todo: implement handling of VIC_BGCOL3
                     rasterTextMode(x)
                 } else {
                     // bitmap mode

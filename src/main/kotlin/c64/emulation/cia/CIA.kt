@@ -312,7 +312,7 @@ class CIA {
             logger.info {"timerAIRQEnabled: $timerAIRQEnabled"}
         }
         // BIT 1: enable / disable Timer B interrupt
-        else if (byte.toInt() and 0b0000_0010 == 0b0000_0010) {
+        if (byte.toInt() and 0b0000_0010 == 0b0000_0010) {
             timerBIRQEnabled = setMode
             logger.info {"timerBIRQEnabled: $timerBIRQEnabled"}
         }
@@ -333,7 +333,7 @@ class CIA {
         logger.info {"timerAEnabled: $timerAEnabled"}
         // BIT 3: Timer A run mode: 1=one-shot, 0=continous
         timerARunMode = byte.toInt() and 0b0000_1000
-        logger.info { "timerARunMode: $timerARunMode" }
+        logger.info { "timerARunMode: " + if (timerARunMode == 0) "continous" else "one-shot" }
         // BIT 4: load latch Timer A
         if (byte.toInt() and 0b0001_0000 == 0b0001_0000) {
             timerA = timerALatch
@@ -354,7 +354,7 @@ class CIA {
         logger.info { "timerBEnabled: $timerBEnabled" }
         // BIT 3: Timer B run mode: 1=one-shot, 0=continous
         timerBRunMode = byte.toInt() and 0b0000_1000
-        logger.info { "timerBRunMode: $timerBRunMode" }
+        logger.info { "timerBRunMode: " + if (timerBRunMode == 0) "continous" else "one-shot" }
         // BIT 4: load latch Timer B
         if (byte.toInt() and 0b0001_0000 == 0b0001_0000) {
             timerB = timerBLatch
