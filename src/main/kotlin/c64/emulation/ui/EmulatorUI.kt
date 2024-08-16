@@ -50,7 +50,6 @@ class EmulatorUI {
 
         frame.isVisible = true
         frame.pack()
-        keyboard.sourceComponent = frame
         frame.addKeyListener(keyboard)
         frame.addMouseListener(object: MouseAdapter() {
             override fun mousePressed(e: MouseEvent?) {

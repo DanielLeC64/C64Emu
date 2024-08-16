@@ -3,12 +3,10 @@ package c64.emulation.cia
 import c64.emulation.System
 import c64.emulation.System.cpu
 import c64.emulation.System.memory
-import c64.emulation.System.registers
 import c64.emulation.System.vic
 import c64.emulation.cpu.CPU
 import c64.emulation.vic.VIC
 import mu.KotlinLogging
-import java.awt.Component
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -74,8 +72,6 @@ class Keyboard : KeyListener {
             KeyEvent.VK_9 to 0x3B)
     }
 
-    private var pastedText: String = ""
-    var sourceComponent: Component? = null
 
     // todo: keys to translate:  C= SHIFT-LOCK CTRL CLR/HOME RESTORE ARROW-UP
     // todo: refactor and use charCode where possible
@@ -194,7 +190,7 @@ class Keyboard : KeyListener {
             }
         }
         catch (e: Exception) {
-            println(e)
+            logger.error {e}
         }
     }
 
@@ -205,8 +201,8 @@ class Keyboard : KeyListener {
     private fun pasteText(pastedText: String) {
         // characters for testing:  abc123 ABC!"#$%&()*+,-./:;<>=?@XXX abccdf
         logger.info {"pasting text <${pastedText}>"}
-        this.pastedText = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
-        if (pastedText.isNotEmpty()) {
+        val text = pastedText.replace(Regex("[^a-zA-Z0-9 !\"#\$%&()*+,-./:;<>=?@]"), "")
+        if (text.isNotEmpty()) {
             val bitmapMode = memory.fetch(VIC.VIC_SCROLY) and 0b0010_0000u
             // do pasting only in textmode
             if (bitmapMode.toInt() == 0) {
@@ -218,20 +214,20 @@ class Keyboard : KeyListener {
                 // adjust screen memory address according to the cursor pos
                 screenMemoryAddress += cursorAddress
 
-                for (i in pastedText.indices) {
-                    memory.store(screenMemoryAddress + i, petscii2screencode(pastedText[i]).code.toUByte())
+                for (i in text.indices) {
+                    memory.store(screenMemoryAddress + i, petscii2screencode(text[i]).code.toUByte())
                 }
                 // set cursor to the end of the pasted text
-                cursorAddress += pastedText.length
+                cursorAddress += text.length
                 // set row
                 memory.store(0xD6, (1 + cursorAddress / 40).toUByte())
                 // set col
                 memory.store(0xD3, (cursorAddress % 40).toUByte())
 
                 // TODO: 58732 ($E56C) 	Cursorposition (und Bildschirm- und Farb-RAM-Zeiger) setzen; Werte in Speicheradresse 211 ($D3), 214 ($D6) (Zeile, Spalte) vorgeben
-                memory.pushWordToStack(registers.PC)
+                //memory.pushWordToStack(registers.PC)
                 //memory.pushToStack(registers.getProcessorStatus())
-                registers.PC = 0xE56C
+                //registers.PC = 0xE56C
                 //registers.PC = 0xFFF0
             }
         }

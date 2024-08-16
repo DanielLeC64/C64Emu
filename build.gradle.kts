@@ -1,6 +1,6 @@
 
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "2.0.10"
     application
 }
 
@@ -33,9 +33,9 @@ distributions {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("io.github.microutils:kotlin-logging:3.0.5")
 
-    implementation("org.slf4j:slf4j-api:2.0.3")
-    implementation("org.slf4j:slf4j-log4j12:2.0.3")
+    implementation("org.slf4j:slf4j-api:2.0.13")
+    implementation("org.slf4j:slf4j-log4j12:2.0.13")
 }
