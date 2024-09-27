@@ -56,7 +56,11 @@ class Debugger(private var disassembly: Disassembly) {
         }
         var continueRun = false
         while (!continueRun) {
-            val consoleInput = scanner.nextLine()
+            // console input only works if the emulator is started via Kotlin run job - not the gradle run task
+            // start class: c64.emulation.ui.EmulatorUIKt
+            // VM option: -DromsPath="C:\C64 Playground\roms"
+            // working dir: C:\C64 Playground
+            val consoleInput = if (scanner.hasNextLine()) scanner.nextLine() else ""
             when {
                 consoleInput.matches(PRINT_MEM_CMD) -> {
                     val addr = consoleInput.substring(1).toInt(16)
