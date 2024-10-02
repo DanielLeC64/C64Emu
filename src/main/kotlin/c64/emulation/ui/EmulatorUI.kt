@@ -29,7 +29,7 @@ import kotlin.concurrent.timer
 class EmulatorUI {
 
     companion object {
-        var prgToLoad: String = "./src/test/resources/prg/extended color mode 2.prg"
+        var prgToLoad: String = "./src/test/resources/prg/multicolor.prg"
         //var prgToLoad: String = "./src/test/resources/prg/extended color mode.prg"
         //var prgToLoad: String = "./src/test/resources/prg/christmas demo.prg"
         val VIEWPORT_TOP_LEFT: Point = Point(11, 0)

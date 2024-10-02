@@ -124,7 +124,8 @@ class VIC {
         var bitmapColorAddress: Int = 0,
         var bitmapColorRowAddress: Int = 0,
         var bitmapRowAddress: Int = 0,
-        var screenMemoryAddress: Int = 0
+        var screenMemoryAddress: Int = 0,
+        var isMulticolorMode: Boolean = false
     )
 
     private val vicRam: UByteArray
@@ -202,7 +203,7 @@ class VIC {
         val displayEnabled = fetch(VIC_SCROLY).toInt() and 0b0001_0000 == 0b0001_0000
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
-        val isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
+        val isExtendedColorMode = fetch(VIC_SCROLY).toInt() and 0b0100_0000 == 0b0100_0000
 
         var screenTop = SCREEN_TOP
         var screenLeft = SCREEN_LEFT
@@ -239,6 +240,7 @@ class VIC {
         rastererState.bitmapRowAddress =
             rastererState.videoBankAddress + rastererState.bitmapAddress + rastererState.textRowAddr * 8 + rastererState.charY
         rastererState.screenMemoryAddress = getScreenMemoryAddress()
+        rastererState.isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
@@ -263,15 +265,19 @@ class VIC {
                     rastererState.backgroundColor
                 } else if (bitmapMode.toInt() == 0) {
                     // text-mode
-                    // todo: SCROLX bit 4 - isMulticolorMode - multicolor text mode
-                    // todo: SCROLY bit 6 - Extended Background Color Mode
-                    // todo: implement handling of VIC_BGCOL1
-                    // todo: implement handling of VIC_BGCOL2
-                    // todo: implement handling of VIC_BGCOL3
-                    rasterTextMode(x)
+                    if (isExtendedColorMode) {
+                        // https://www.retro-programming.de/programming/nachschlagewerk/vic-ii/vic-ii-grafikmodes-text/
+                        // todo: SCROLY bit 6 - Extended Background Color Mode
+                        // todo: implement handling of VIC_BGCOL1
+                        // todo: implement handling of VIC_BGCOL2
+                        // todo: implement handling of VIC_BGCOL3
+                        rasterTextMode(x)
+                    } else {
+                        rasterTextMode(x)
+                    }
                 } else {
                     // bitmap mode
-                    if (!isMulticolorMode) {
+                    if (!rastererState.isMulticolorMode) {
                         // hires bitmap mode
                         rasterHiresMode(x)
                     } else {
@@ -288,16 +294,40 @@ class VIC {
     private fun rasterTextMode(x: Int): Int {
         val screenMemoryRowAddress = rastererState.videoBankAddress + rastererState.screenMemoryAddress + rastererState.textRowAddr
         val char = memory.fetch(screenMemoryRowAddress + rastererState.textCol)
-        val charColor = COLOR_TABLE[memory.fetch(rastererState.colorRamRowAddress + rastererState.textCol).toInt() and 0b0000_1111]
+        val charColor = memory.fetch(rastererState.colorRamRowAddress + rastererState.textCol)
+        val charScreenColor = COLOR_TABLE[charColor.toInt() and 0b0000_1111]
         val fetchFromCharMemoryFunction = getFetchFromCharMemoryFunction()
 
         val charX = x and 0b0000_0111
         val rawCharData = fetchFromCharMemoryFunction(char.toInt() * 8 + rastererState.charY)
-        val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
-        return if (rawCharData and pixelMask == pixelMask)
-            charColor
-        else
-            rastererState.backgroundColor
+
+        if (rastererState.isMulticolorMode && charColor > 7u) {
+            // todo: try to unify this code with the multicolor sprite code...
+            // get shiftCount, 6,4,2 or 0
+            val shiftPxBy = (charX.inv() and 0b0000_0110)
+            // read the correct bits (use only the two lowest bits)
+            val pxColorBits = (rawCharData.toInt() shr shiftPxBy) and 0b0000_0011
+            // %00 = transparent
+            return if (pxColorBits == 0b0000_0000) {
+                // %00 background color 0
+                COLOR_TABLE[fetch(VIC_BGCOL0).toInt() and 0b0000_1111]
+            } else if (pxColorBits == 0b0000_0010) {
+                // %10 background color 1
+                COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+            } else if (pxColorBits == 0b0000_0001) {
+                // %01 background color 2
+                COLOR_TABLE[fetch(VIC_BGCOL2).toInt() and 0b0000_1111]
+            } else {
+                // %11 = color from color ram
+                COLOR_TABLE[charColor.toInt() and 0b0000_0111]
+            }
+        } else {
+            val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
+            return if (rawCharData and pixelMask == pixelMask)
+                charScreenColor
+            else
+                rastererState.backgroundColor
+        }
     }
 
     private fun rasterHiresMode(x: Int): Int {
