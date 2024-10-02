@@ -125,7 +125,8 @@ class VIC {
         var bitmapColorRowAddress: Int = 0,
         var bitmapRowAddress: Int = 0,
         var screenMemoryAddress: Int = 0,
-        var isMulticolorMode: Boolean = false
+        var isMulticolorMode: Boolean = false,
+        var isExtendedColorMode: Boolean = false
     )
 
     private val vicRam: UByteArray
@@ -213,7 +214,6 @@ class VIC {
         val displayEnabled = fetch(VIC_SCROLY).toInt() and 0b0001_0000 == 0b0001_0000
         val bitmapMode = fetch(VIC_SCROLY) and 0b0010_0000u
         val borderColor = COLOR_TABLE[fetch(VIC_EXTCOL).toInt() and 0b0000_1111]
-        val isExtendedColorMode = fetch(VIC_SCROLY).toInt() and 0b0100_0000 == 0b0100_0000
 
         var screenTop = SCREEN_TOP
         var screenLeft = SCREEN_LEFT
@@ -251,6 +251,7 @@ class VIC {
             rastererState.videoBankAddress + rastererState.bitmapAddress + rastererState.textRowAddr * 8 + rastererState.charY
         rastererState.screenMemoryAddress = getScreenMemoryAddress()
         rastererState.isMulticolorMode = fetch(VIC_SCROLX).toInt() and 0b0001_0000 == 0b0001_0000
+        rastererState.isExtendedColorMode = fetch(VIC_SCROLY).toInt() and 0b0100_0000 == 0b0100_0000
 
         for (rastercolumn in 0 until PAL_RASTERCOLUMNS) {
             var color: Int
@@ -275,16 +276,7 @@ class VIC {
                     rastererState.backgroundColor
                 } else if (bitmapMode.toInt() == 0) {
                     // text-mode
-                    if (isExtendedColorMode) {
-                        // https://www.retro-programming.de/programming/nachschlagewerk/vic-ii/vic-ii-grafikmodes-text/
-                        // todo: SCROLY bit 6 - Extended Background Color Mode
-                        // todo: implement handling of VIC_BGCOL1
-                        // todo: implement handling of VIC_BGCOL2
-                        // todo: implement handling of VIC_BGCOL3
-                        rasterTextMode(x)
-                    } else {
-                        rasterTextMode(x)
-                    }
+                    rasterTextMode(x)
                 } else {
                     // bitmap mode
                     if (!rastererState.isMulticolorMode) {
@@ -303,12 +295,17 @@ class VIC {
 
     private fun rasterTextMode(x: Int): Int {
         val screenMemoryRowAddress = rastererState.videoBankAddress + rastererState.screenMemoryAddress + rastererState.textRowAddr
-        val char = memory.fetch(screenMemoryRowAddress + rastererState.textCol)
+        var char = memory.fetch(screenMemoryRowAddress + rastererState.textCol)
         val charColor = memory.fetch(rastererState.colorRamRowAddress + rastererState.textCol)
         val charScreenColor = COLOR_TABLE[charColor.toInt() and 0b0000_1111]
         val fetchFromCharMemoryFunction = getFetchFromCharMemoryFunction()
 
         val charX = x and 0b0000_0111
+
+        if (rastererState.isExtendedColorMode) {
+            char = char and 0b0011_1111u
+        }
+
         val rawCharData = fetchFromCharMemoryFunction(char.toInt() * 8 + rastererState.charY)
 
         if (rastererState.isMulticolorMode && charColor > 7u) {
@@ -320,7 +317,7 @@ class VIC {
             // %00 = transparent
             return if (pxColorBits == 0b0000_0000) {
                 // %00 background color 0
-                COLOR_TABLE[fetch(VIC_BGCOL0).toInt() and 0b0000_1111]
+                rastererState.backgroundColor
             } else if (pxColorBits == 0b0000_0010) {
                 // %10 background color 1
                 COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
@@ -331,6 +328,35 @@ class VIC {
                 // %11 = color from color ram
                 COLOR_TABLE[charColor.toInt() and 0b0000_0111]
             }
+        } else if (rastererState.isExtendedColorMode) {
+            //todo: extended color mode
+            /*
+            // https://www.retro-programming.de/programming/nachschlagewerk/vic-ii/vic-ii-grafikmodes-text/
+            // only first 64 chars can be displayed (bit 0-5)
+            // background color
+            // %01 (64-127): bgcolor 1
+            // %10 (128-191): bgcolor 2
+            // %11 (192-255): bgcolor 3
+            */
+            var bgColor = (memory.fetch(screenMemoryRowAddress + rastererState.textCol) and 0b1100_0000u).toInt()
+            val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
+            return if (rawCharData and pixelMask == pixelMask)
+                charScreenColor
+            else {
+                if (bgColor == 0b0100_0000) {
+                    // %01 background color 1
+                    COLOR_TABLE[fetch(VIC_BGCOL1).toInt() and 0b0000_1111]
+                } else if (bgColor == 0b1000_0000) {
+                    // %10 background color 2
+                    COLOR_TABLE[fetch(VIC_BGCOL2).toInt() and 0b0000_1111]
+                } else if (bgColor == 0b1100_0000) {
+                    // %11 background color 3
+                    COLOR_TABLE[fetch(VIC_BGCOL3).toInt() and 0b0000_1111]
+                } else {
+                    rastererState.backgroundColor
+                }
+            }
+
         } else {
             val pixelMask: UByte = (0b1000_0000u shr charX).toUByte()
             return if (rawCharData and pixelMask == pixelMask)
