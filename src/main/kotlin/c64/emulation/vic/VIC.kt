@@ -148,6 +148,7 @@ class VIC {
      * Stores a single byte at the given VIC address.
      */
     fun store(address: Int, byte: UByte) {
+        val oldValue = vicRam[address and 0b0011_1111]
         // translate address to $00-$3F
         vicRam[address and 0b0011_1111] = byte
 
@@ -165,10 +166,19 @@ class VIC {
                 if (byte.toInt() and 0b1100_0000 > 0) {
                     logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1100_0000u).toBinary()}" }
                 }
+                if (oldValue and 0b0010_0000u != byte and 0b0010_0000u) {
+                    logger.info { "graphics mode: " + if ((byte and 0b0010_0000u).toInt() == 0) "text" else "bitmap" }
+                }
+                if (oldValue and 0b0100_0000u != byte and 0b0100_0000u) {
+                    logger.info { "color mode: " + if ((byte and 0b0100_0000u).toInt() == 0) "hires" else "extended color" }
+                }
             }
             VIC_SCROLX -> {
                 if (byte.toInt() and 0b0010_0000 > 0) {
                     logger.warn { "not handled BITS for VIC_SCROLX register: ${(byte and 0b0010_0000u).toBinary()}" }
+                }
+                if (oldValue and 0b0001_0000u != byte and 0b0001_0000u) {
+                    logger.info { "color mode: " + if ((byte and 0b0001_0000u).toInt() == 0) "hires" else "multicolor" }
                 }
             }
         }
