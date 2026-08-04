@@ -34,6 +34,6 @@ object PETASCIIHelper {
      * @return given value as character
      */
     fun PET2ASCII(value: Short): Char {
-        return value.toChar()
+        return value.toInt().toChar()
     }
 }

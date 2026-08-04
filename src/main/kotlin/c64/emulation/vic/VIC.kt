@@ -93,8 +93,10 @@ class VIC {
         const val VIC_SPMC0 = 0xD025
         // Sprite Multicolor Register 1
         const val VIC_SPMC1 = 0xD026
-        // Sprite n Color Register ($D027-D02E)
+        // Sprite n Color Register ($D027-$D02E)
         const val VIC_SPCOL = 0xD027
+        // Sprite 7 Color Register ($D02E)
+        const val VIC_SPCOL7 = 0xD02E
 
         // color ram $D800-DBFF
         const val COLOR_RAM = 0xD800
@@ -164,8 +166,8 @@ class VIC {
                 logger.info { "missing IMPL for VIC:write ${address.toHex()}: ${byte.toHex()} (${byte.toBinary()})" }
             }
             VIC_SCROLY -> {
-                if (byte.toInt() and 0b1100_0000 > 0) {
-                    logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1100_0000u).toBinary()}" }
+                if (byte.toInt() and 0b1000_0000 > 0) {
+                    logger.warn { "not handled BITS for VIC_SCROLY register: ${(byte and 0b1000_0000u).toBinary()}" }
                 }
                 if (oldValue and 0b0010_0000u != byte and 0b0010_0000u) {
                     logger.info { "graphics mode: " + if ((byte and 0b0010_0000u).toInt() == 0) "text" else "bitmap" }
@@ -189,6 +191,13 @@ class VIC {
      * Fetches a single byte from the given VIC address.
      */
     fun fetch(address: Int): UByte {
+        // TODO: special handling for following registers (use 1 for all unused bits)
+        // TODO: SCROLX, VICIRQ ($d019), IRQMASK ($d01a)
+        when (address) {
+            in VIC_EXTCOL..VIC_SPCOL7 -> {
+                return vicRam[address and 0b0011_1111] or 0b1111_0000.toUByte()
+            }
+        }
         // translate address to $00-$3F
         return vicRam[address and 0b0011_1111]
     }
